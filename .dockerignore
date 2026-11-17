@@ -1,0 +1,12 @@
+.git
+.gradle
+.idea
+.kotlin
+datasorce/
+data/
+runtime-data/
+**/*.glb
+**/manifest.json
+**/manifest-*.json
+src/test/
+tools/tests/
