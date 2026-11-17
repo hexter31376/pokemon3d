@@ -1,6 +1,7 @@
 package com.pokemon3d.api.model3d.infrastructure.storage.s3
 
 import com.pokemon3d.api.model3d.application.ModelResourceService
+import com.pokemon3d.api.model3d.domain.ModelAssetPublisher
 import com.pokemon3d.api.model3d.domain.ModelAssetStorage
 import com.pokemon3d.api.model3d.domain.ModelMetadataRepository
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -18,6 +19,9 @@ class S3StorageConfiguration {
 
     @Bean
     fun modelAssetStorage(client: S3Client, properties: S3StorageProperties): ModelAssetStorage = S3ModelAssetStorage(client, properties)
+
+    @Bean
+    fun modelAssetPublisher(client: S3Client, properties: S3StorageProperties): ModelAssetPublisher = S3ModelAssetPublisher(client, properties)
 
     @Bean
     fun modelResourceService(metadata: ModelMetadataRepository, storage: ModelAssetStorage) = ModelResourceService(metadata, storage)

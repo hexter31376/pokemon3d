@@ -1,7 +1,5 @@
 package com.pokemon3d.api.model3d.infrastructure.storage.s3
 
-import com.pokemon3d.api.model3d.infrastructure.storage.s3.tools.ModelDatasetUploader
-import com.pokemon3d.api.model3d.infrastructure.storage.s3.tools.TransferReport
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -31,10 +29,11 @@ class StorageIntegrationTests {
             client.createBucket { it.bucket(bucket) }
             try {
                 val store = S3ObjectStore(client, bucket)
-                val uploader = ModelDatasetUploader(store, keys)
-                assertEquals(TransferReport(2, 0, 2), uploader.execute(root, manifestPath, true))
-                assertEquals(TransferReport(0, 2, 2), uploader.execute(root, manifestPath, true))
-                assertEquals(TransferReport(0, 0, 2), uploader.execute(root, manifestPath, false))
+                val publisher = S3ModelAssetPublisher(client, properties)
+                publisher.publish(manifest.models.single(), root.resolve(asset.path))
+                publisher.publish(manifest.models.single(), root.resolve(asset.path))
+                assertEquals(ContentDigest(asset.sizeBytes, asset.sha256), store.contentDigest(keys.resolve(asset.path)))
+                store.put(keys.resolve("manifest.json"), manifestPath, "application/json", Files.newInputStream(manifestPath).use(::digest).sha256)
                 val adapter = S3ModelAssetStorage(client, properties)
                 assertTrue(adapter.find(asset)!!.matches(asset))
                 assertNull(adapter.find(asset.copy(path = "models/missing.glb")))

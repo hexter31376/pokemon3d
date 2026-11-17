@@ -94,9 +94,9 @@ tasks.register<Test>("storageIntegrationTest") {
     shouldRunAfter(tasks.test)
 }
 
-tasks.register<JavaExec>("modelStorage") {
-    group = "verification"
-    description = "Uploads/verifies model assets (--args='upload|verify --data-root ... --manifest ...')."
+tasks.register<JavaExec>("modelImport") {
+    group = "application"
+    description = "Imports metadata into the durable DB queue, or shows/activates/retries a release."
     classpath = sourceSets.main.get().runtimeClasspath
-    mainClass.set("com.pokemon3d.api.model3d.infrastructure.storage.s3.tools.ModelStorageCliKt")
+    mainClass.set("com.pokemon3d.api.model3d.infrastructure.importer.ModelImportCliKt")
 }
