@@ -13,7 +13,8 @@
   "properties": {
     "schemaVersion": {
       "type": "integer",
-      "const": 1
+      "const": 1,
+      "maximum": 2147483647
     },
     "datasetVersion": {
       "type": "string",
@@ -22,7 +23,8 @@
     },
     "modelCount": {
       "type": "integer",
-      "minimum": 1
+      "minimum": 1,
+      "maximum": 2147483647
     },
     "models": {
       "type": "array",
@@ -49,7 +51,8 @@
           },
           "pokedexNumber": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "maximum": 2147483647
           },
           "nameKo": {
             "type": "string",
@@ -108,7 +111,8 @@
           },
           "generation": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "maximum": 2147483647
           },
           "asset": {
             "type": "object",
@@ -126,7 +130,8 @@
               },
               "sizeBytes": {
                 "type": "integer",
-                "minimum": 1
+                "minimum": 1,
+                "maximum": 9223372036854775807
               },
               "sha256": {
                 "type": "string",
@@ -159,7 +164,8 @@
               "properties": {
                 "index": {
                   "type": "integer",
-                  "minimum": 0
+                  "minimum": 0,
+                  "maximum": 2147483647
                 },
                 "name": {
                   "type": "string",
