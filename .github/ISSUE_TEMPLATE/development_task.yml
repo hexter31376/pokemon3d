@@ -1,0 +1,63 @@
+name: 개발 작업
+description: 기능 구현, 버그 수정, 리팩터링 등 내부 개발 작업을 등록합니다.
+title: "[Task] "
+body:
+  - type: dropdown
+    id: type
+    attributes:
+      label: 작업 유형
+      options:
+        - 기능 구현
+        - 버그 수정
+        - 리팩터링
+        - 성능 개선
+        - 테스트
+        - 인프라 및 설정
+        - 문서
+    validations:
+      required: true
+  - type: textarea
+    id: background
+    attributes:
+      label: 작업 배경 및 목표
+      description: 필요한 이유와 작업 후 달라질 동작을 작성합니다.
+      placeholder: 예) 모델 조회 시 GLB URL과 기존 카메라 설정을 함께 반환한다.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 작업 범위
+      description: 변경할 API, 모듈, 데이터 구조 등 구현 범위를 작성합니다.
+      placeholder: |
+        - 대상 API:
+        - 변경할 모듈 및 설정:
+        - 이번 작업에서 제외할 항목:
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: 작업 목록
+      placeholder: |
+        - [ ] 구현
+        - [ ] 테스트 작성 및 실행
+        - [ ] API 문서 반영
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 완료 기준 및 검증 방법
+      description: 완료를 판단할 조건과 테스트 방법을 작성합니다.
+      placeholder: |
+        - [ ] 요구한 응답 필드와 상태 코드가 확인된다.
+        - [ ] 정상 및 예외 케이스 테스트가 통과한다.
+        - 검증 명령: ./gradlew test
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 의존 작업 및 참고 자료
+      description: 선행 이슈, 설계 문서, 연관 PR 등을 작성합니다. 없으면 생략합니다.
