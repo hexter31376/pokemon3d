@@ -3,6 +3,10 @@ package com.pokemon3d.api.global.dto
 import org.springframework.http.HttpStatus
 
 enum class ErrorCode(val status: HttpStatus, val code: String, val message: String) {
+    MODEL_NOT_FOUND(HttpStatus.NOT_FOUND, "MODEL3D_001", "모델을 찾을 수 없습니다."),
+    MODEL_ASSET_NOT_FOUND(HttpStatus.NOT_FOUND, "MODEL3D_002", "모델 파일을 찾을 수 없습니다."),
+    MODEL_STORAGE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "MODEL3D_003", "모델 저장소를 이용할 수 없습니다."),
+    MODEL_STORAGE_INTEGRITY_ERROR(HttpStatus.BAD_GATEWAY, "MODEL3D_004", "모델 파일 정보를 확인할 수 없습니다."),
     INVALID_PARAMETER(HttpStatus.BAD_REQUEST, "COMMON_001", "요청 값이 올바르지 않습니다."),
     INVALID_REQUEST_BODY(HttpStatus.BAD_REQUEST, "COMMON_002", "요청 본문 형식이 올바르지 않습니다."),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "COMMON_003", "인증이 필요합니다."),

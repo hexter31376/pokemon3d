@@ -5,3 +5,18 @@ spring:
 pokemon:
   models:
     manifest-path: ${POKEMON_MODELS_MANIFEST_PATH:}
+
+  storage:
+    s3:
+      enabled: ${MODEL_STORAGE_ENABLED:false}
+      endpoint: ${MODEL_STORAGE_ENDPOINT:}
+      public-base-url: ${MODEL_STORAGE_PUBLIC_BASE_URL:}
+      region: ${MODEL_STORAGE_REGION:}
+      bucket: ${MODEL_STORAGE_BUCKET:}
+      prefix: ${MODEL_STORAGE_PREFIX:}
+      access-key: ${MODEL_STORAGE_ACCESS_KEY:}
+      secret-key: ${MODEL_STORAGE_SECRET_KEY:}
+      path-style: ${MODEL_STORAGE_PATH_STYLE:true}
+      connect-timeout: ${MODEL_STORAGE_CONNECT_TIMEOUT:3s}
+      attempt-timeout: ${MODEL_STORAGE_ATTEMPT_TIMEOUT:60s}
+      request-timeout: ${MODEL_STORAGE_REQUEST_TIMEOUT:180s}
