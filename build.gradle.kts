@@ -82,7 +82,7 @@ springBoot {
 
 // Container tests are opt-in; default tests require neither Docker nor production assets.
 tasks.test {
-    useJUnitPlatform { excludeTags("storageIntegration") }
+    useJUnitPlatform { excludeTags("storageIntegration", "databaseIntegration") }
 }
 
 tasks.register<Test>("storageIntegrationTest") {
@@ -99,4 +99,12 @@ tasks.register<JavaExec>("modelImport") {
     description = "Imports metadata into the durable DB queue, or shows/activates/retries a release."
     classpath = sourceSets.main.get().runtimeClasspath
     mainClass.set("com.pokemon3d.api.model3d.infrastructure.importer.ModelImportCliKt")
+}
+
+tasks.register<Test>("databaseIntegrationTest") {
+    group = "verification"
+    description = "Tests durable uploads against PostgreSQL and SeaweedFS (requires Compose)."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform { includeTags("databaseIntegration") }
 }
