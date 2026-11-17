@@ -75,3 +75,10 @@ tasks.register<JavaExec>("verifyModelManifest") {
 springBoot {
     mainClass.set("com.pokemon3d.api.Pokemon3dApplicationKt")
 }
+
+tasks.register<JavaExec>("modelStorage") {
+    group = "verification"
+    description = "Uploads/verifies model assets (--args='upload|verify --data-root ... --manifest ...')."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.pokemon3d.api.model3d.infrastructure.storage.s3.tools.ModelStorageCliKt")
+}
