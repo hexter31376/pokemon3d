@@ -2,12 +2,25 @@ spring:
   docker:
     compose:
       enabled: false
+  datasource:
+    url: ${MODEL_DATABASE_URL:jdbc:postgresql://localhost:5432/pokemon3d}
+    username: ${MODEL_DATABASE_USERNAME:}
+    password: ${MODEL_DATABASE_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
   application:
     name: pokemon3d
 
 pokemon:
-  models:
-    manifest-path: ${POKEMON_MODELS_MANIFEST_PATH:}
+  uploads:
+    enabled: ${MODEL_UPLOAD_WORKER_ENABLED:false}
+    spool-path: ${MODEL_UPLOAD_SPOOL_PATH:runtime-data/uploads}
+    poll-delay-ms: 1000
+    lease-seconds: 600
+    max-attempts: 3
+    retry-delay-seconds: 30
 
   storage:
     s3:

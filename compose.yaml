@@ -1,4 +1,19 @@
 services:
+  postgres:
+    image: postgres:17
+    ports:
+      - '127.0.0.1:${MODEL_DATABASE_PORT:-5432}:5432'
+    environment:
+      POSTGRES_DB: pokemon3d
+      POSTGRES_USER: ${MODEL_DATABASE_USERNAME:?Set MODEL_DATABASE_USERNAME in .env}
+      POSTGRES_PASSWORD: ${MODEL_DATABASE_PASSWORD:?Set MODEL_DATABASE_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 3s
+      retries: 20
   seaweedfs:
     image: chrislusf/seaweedfs:4.53
     command: [mini, '-dir=/data', '-admin.ui=false', '-webdav=false', '-master.telemetry=false']
@@ -12,4 +27,5 @@ services:
       - seaweedfs-data:/data
 
 volumes:
+  postgres-data:
   seaweedfs-data:

@@ -9,7 +9,7 @@ import tools.jackson.databind.json.JsonMapper
 import tools.jackson.module.kotlin.KotlinFeature
 import tools.jackson.module.kotlin.KotlinModule
 
-/** Shared strict parsing and validation for both extraction and server startup. */
+/** Strict parsing and validation for offline extraction and database import. */
 internal object ManifestJson {
     val mapper = JsonMapper.builder()
         .addModule(KotlinModule.Builder().enable(KotlinFeature.StrictNullChecks).build())

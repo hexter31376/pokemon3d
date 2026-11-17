@@ -1,28 +1,17 @@
 package com.pokemon3d.api
 
+import com.pokemon3d.api.model3d.domain.ModelMetadataRepository
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
-import java.nio.file.Path
+import kotlin.test.assertTrue
 
 @SpringBootTest(properties = [
-    "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration",
+    "spring.datasource.url=jdbc:h2:mem:startup;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
+    "spring.datasource.username=sa", "spring.datasource.password=",
+    "pokemon.uploads.enabled=false", "pokemon.storage.s3.enabled=false",
 ])
 class Pokemon3dApplicationTests {
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun manifestProperties(registry: DynamicPropertyRegistry) {
-            registry.add("pokemon.models.manifest-path") {
-                Path.of(Pokemon3dApplicationTests::class.java.getResource("/manifest/valid.json")!!.toURI()).toString()
-            }
-        }
-    }
-
-
-    @Test
-    fun contextLoads() {
-    }
-
+    @Autowired lateinit var models: ModelMetadataRepository
+    @Test fun `starts with an empty DB and no manifest file`() { assertTrue(models.findAll().isEmpty()) }
 }

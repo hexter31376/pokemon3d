@@ -26,6 +26,9 @@ dependencies {
     implementation("software.amazon.awssdk:s3")
     implementation("software.amazon.awssdk:url-connection-client")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.springframework.boot:spring-boot-starter-flyway")
+    runtimeOnly("org.flywaydb:flyway-database-postgresql")
+    testRuntimeOnly("com.h2database:h2")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
@@ -67,7 +70,7 @@ tasks.register<JavaExec>("modelManifest") {
 
 tasks.register<JavaExec>("verifyModelManifest") {
     group = "verification"
-    description = "Loads an external manifest with the production repository (-PmanifestPath=...)."
+    description = "Validates an offline import manifest (-PmanifestPath=...)."
     classpath = sourceSets.main.get().runtimeClasspath
     mainClass.set("com.pokemon3d.api.model3d.infrastructure.manifest.VerifyModelManifestKt")
     args(providers.gradleProperty("manifestPath").getOrElse(""))

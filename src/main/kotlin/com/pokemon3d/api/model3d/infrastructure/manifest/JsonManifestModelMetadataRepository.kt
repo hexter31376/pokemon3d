@@ -5,7 +5,7 @@ import com.pokemon3d.api.model3d.domain.ModelMetadata
 import com.pokemon3d.api.model3d.domain.ModelBounds
 
 import java.nio.file.Path
-/** Loads once. No GLB reads, network access, updates, or partial fallback snapshots. */
+/** Offline validation helper only; runtime metadata queries use the DB repository. */
 class JsonManifestModelMetadataRepository(path: Path) : ModelMetadataRepository {
     private val snapshot: ModelManifest
     private val byId: Map<String, ModelMetadata>

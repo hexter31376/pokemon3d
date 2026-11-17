@@ -12,12 +12,13 @@ class ModelResourceService(
     private val storage: ModelAssetStorage,
 ) {
     fun findById(modelId: String): ModelResource {
-        val model = metadata.findById(modelId) ?: throw ModelResourceNotFoundException(modelId, false)
+        val found = metadata.findVersionedById(modelId) ?: throw ModelResourceNotFoundException(modelId, false)
+        val model = found.model
         val stored = storage.find(model.asset) ?: throw ModelResourceNotFoundException(modelId, true)
         if (!stored.matches(model.asset)) {
             throw ModelStorageException(StorageFailure.INTEGRITY_MISMATCH, model.asset.path)
         }
-        return ModelResource(metadata.datasetVersion, model, storage.publicUrl(model.asset))
+        return ModelResource(found.datasetVersion, model, storage.publicUrl(model.asset))
     }
 }
 
