@@ -101,6 +101,13 @@ tasks.register<JavaExec>("modelImport") {
     mainClass.set("com.pokemon3d.api.model3d.infrastructure.importer.ModelImportCliKt")
 }
 
+tasks.register<JavaExec>("configurePublicModelAccess") {
+    group = "application"
+    description = "Grants anonymous GET and browser CORS access only to published GLB objects in the configured bucket."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.pokemon3d.api.model3d.infrastructure.storage.s3.ConfigurePublicModelAccessKt")
+}
+
 tasks.register<Test>("databaseIntegrationTest") {
     group = "verification"
     description = "Tests durable uploads against PostgreSQL and SeaweedFS (requires Compose)."
