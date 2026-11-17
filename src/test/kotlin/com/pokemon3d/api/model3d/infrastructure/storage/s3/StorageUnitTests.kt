@@ -43,7 +43,8 @@ class StorageUnitTests {
                 1,
                 "a".repeat(64),
                 emptyList()
-            )
+            ),
+            ModelStorageLocation("test-bucket", "pokemon"),
         ).host)
         verifyNoInteractions(client)
     }
@@ -84,16 +85,22 @@ class StorageUnitTests {
 
     @Test
     fun `application combines metadata and URL and rejects missing or inconsistent storage`() {
-        val repository = JsonManifestModelMetadataRepository(Path.of(javaClass.getResource("/manifest/valid.json")!!.toURI()))
+        val manifestRepository = JsonManifestModelMetadataRepository(Path.of(javaClass.getResource("/manifest/valid.json")!!.toURI()))
+        val location = ModelStorageLocation("fixture-bucket", "fixture-prefix")
+        val repository = object : ModelMetadataRepository by manifestRepository {
+            override fun findVersionedById(modelId: String) = manifestRepository.findById(modelId)?.let {
+                VersionedModel(manifestRepository.datasetVersion, it, location)
+            }
+        }
         val asset = repository.findAll().single().asset
         val storage = mock(ModelAssetStorage::class.java)
         val service = ModelResourceService(repository, storage)
         assertFalse(assertFailsWith<ModelResourceNotFoundException> { service.findById("absent") }.missingAsset)
         assertTrue(assertFailsWith<ModelResourceNotFoundException> { service.findById("fixture_001") }.missingAsset)
-        `when`(storage.find(asset)).thenReturn(StoredModelAsset(asset.sizeBytes, "text/plain", asset.sha256))
+        `when`(storage.find(asset, location)).thenReturn(StoredModelAsset(asset.sizeBytes, "text/plain", asset.sha256))
         assertEquals(StorageFailure.INTEGRITY_MISMATCH, assertFailsWith<ModelStorageException> { service.findById("fixture_001") }.failure)
-        `when`(storage.find(asset)).thenReturn(StoredModelAsset(asset.sizeBytes, "model/gltf-binary", asset.sha256))
-        `when`(storage.publicUrl(asset)).thenReturn(URI("https://assets.example.test/a.glb"))
+        `when`(storage.find(asset, location)).thenReturn(StoredModelAsset(asset.sizeBytes, "model/gltf-binary", asset.sha256))
+        `when`(storage.publicUrl(asset, location)).thenReturn(URI("https://assets.example.test/a.glb"))
         assertEquals("fixture-v1", service.findById("fixture_001").datasetVersion)
     }
 

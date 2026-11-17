@@ -1,5 +1,6 @@
 package com.pokemon3d.api.model3d.infrastructure.storage.s3
 
+import com.pokemon3d.api.model3d.domain.ModelStorageLocation
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -23,6 +24,7 @@ class StorageIntegrationTests {
         env["MODEL_STORAGE_PUBLIC_BASE_URL"] = env.getValue("MODEL_STORAGE_ENDPOINT").trimEnd('/') + "/$bucket"
         val properties = S3StorageProperties.fromEnvironment(env)
         val keys = ObjectKeyResolver(properties.prefix)
+        val location = ModelStorageLocation(properties.bucket, properties.prefix)
         val (manifestPath, manifest) = createDataset(root)
         val asset = manifest.models.single().asset
         S3ClientFactory.create(properties).use { client ->
@@ -30,18 +32,18 @@ class StorageIntegrationTests {
             try {
                 val store = S3ObjectStore(client, bucket)
                 val publisher = S3ModelAssetPublisher(client, properties)
-                publisher.publish(manifest.models.single(), root.resolve(asset.path))
-                publisher.publish(manifest.models.single(), root.resolve(asset.path))
+                publisher.publish(manifest.models.single(), root.resolve(asset.path), location)
+                publisher.publish(manifest.models.single(), root.resolve(asset.path), location)
                 assertEquals(ContentDigest(asset.sizeBytes, asset.sha256), store.contentDigest(keys.resolve(asset.path)))
                 store.put(keys.resolve("manifest.json"), manifestPath, "application/json", Files.newInputStream(manifestPath).use(::digest).sha256)
                 val adapter = S3ModelAssetStorage(client, properties)
-                assertTrue(adapter.find(asset)!!.matches(asset))
-                assertNull(adapter.find(asset.copy(path = "models/missing.glb")))
+                assertTrue(adapter.find(asset, location)!!.matches(asset))
+                assertNull(adapter.find(asset.copy(path = "models/missing.glb"), location))
                 // Public access is an explicit bucket policy, independent of the SDK credentials.
                 val resource = "arn:aws:s3:::$bucket/${keys.resolve("models")}/*"
                 client.putBucketPolicy { it.bucket(bucket).policy("""{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"s3:GetObject","Resource":"$resource"}]}""") }
                 HttpClient.newHttpClient().use { http ->
-                    val response = http.send(HttpRequest.newBuilder(adapter.publicUrl(asset)).GET().build(), HttpResponse.BodyHandlers.ofByteArray())
+                    val response = http.send(HttpRequest.newBuilder(adapter.publicUrl(asset, location)).GET().build(), HttpResponse.BodyHandlers.ofByteArray())
                     assertEquals(200, response.statusCode())
                     assertEquals("model/gltf-binary", response.headers().firstValue("Content-Type").orElseThrow())
                     assertContentEquals(Files.readAllBytes(root.resolve(asset.path)), response.body())

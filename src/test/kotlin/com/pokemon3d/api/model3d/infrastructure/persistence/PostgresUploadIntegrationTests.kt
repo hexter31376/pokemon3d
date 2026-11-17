@@ -1,6 +1,7 @@
 package com.pokemon3d.api.model3d.infrastructure.persistence
 
 import com.pokemon3d.api.model3d.application.ModelUploadWorker
+import com.pokemon3d.api.model3d.domain.ModelStorageLocation
 import com.pokemon3d.api.model3d.infrastructure.importer.ManifestDatabaseImporter
 import com.pokemon3d.api.model3d.infrastructure.storage.s3.*
 import org.junit.jupiter.api.AfterAll
@@ -41,10 +42,11 @@ class PostgresUploadIntegrationTests : ModelUploadDatabaseTests() {
 
     @Test fun `actual S3 bytes verified before database activation and retries preserve object`() {
         val (path, _) = createDataset(root)
-        val id = ManifestDatabaseImporter(jobs, root.resolve("spool")).submit(root, path, "s3-test")
         val env = System.getenv().toMutableMap()
         env["MODEL_STORAGE_BUCKET"] = "test-${UUID.randomUUID()}"
         val props = S3StorageProperties.fromEnvironment(env)
+        val location = ModelStorageLocation(props.bucket, props.prefix)
+        val id = ManifestDatabaseImporter(jobs, root.resolve("spool"), location).submit(root, path, "s3-test")
         S3ClientFactory.create(props).use { client ->
             client.createBucket { it.bucket(props.bucket) }
             var key: String? = null
@@ -60,7 +62,7 @@ class PostgresUploadIntegrationTests : ModelUploadDatabaseTests() {
                 val store = S3ObjectStore(client, props.bucket)
                 assertEquals(ContentDigest(model.asset.sizeBytes, model.asset.sha256), store.contentDigest(key))
                 // A retry after the DB commit is lost can verify the already uploaded object without local data.
-                publisher.publish(model, root.resolve("no-longer-present.glb"))
+                publisher.publish(model, root.resolve("no-longer-present.glb"), location)
                 // Conditional PUT is enforced by this real S3-compatible server.
                 val collision = assertFailsWith<software.amazon.awssdk.services.s3.model.S3Exception> {
                     client.putObject({ it.bucket(props.bucket).key(key).ifNoneMatch("*") },

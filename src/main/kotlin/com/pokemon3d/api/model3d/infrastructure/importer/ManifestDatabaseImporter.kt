@@ -11,7 +11,11 @@ import java.nio.file.Path
 import java.util.UUID
 
 /** One-time import boundary. The running application never opens a manifest. */
-class ManifestDatabaseImporter(private val jobs: ModelUploadRepository, private val spool: Path) {
+class ManifestDatabaseImporter(
+    private val jobs: ModelUploadRepository,
+    private val spool: Path,
+    private val storageLocation: ModelStorageLocation,
+) {
     fun submit(root: Path, manifestPath: Path, requestKey: String): UUID {
         val bytes = Files.readAllBytes(manifestPath)
         val manifest = ManifestJson.mapper.readValue(bytes, ModelManifest::class.java).also(ManifestValidator::validate)
@@ -33,6 +37,6 @@ class ManifestDatabaseImporter(private val jobs: ModelUploadRepository, private 
             val key = "releases/$id/models/${model.modelId}/${model.asset.sha256}.glb"
             PreparedModel(model.copy(asset = model.asset.copy(path = key)), staged)
         }
-        return jobs.register(id, requestKey, manifest.datasetVersion, fingerprint, prepared)
+        return jobs.register(id, requestKey, manifest.datasetVersion, fingerprint, storageLocation, prepared)
     }
 }

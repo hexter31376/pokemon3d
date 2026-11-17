@@ -1,6 +1,7 @@
 package com.pokemon3d.api.model3d.infrastructure.importer
 
 import com.pokemon3d.api.Pokemon3dApplication
+import com.pokemon3d.api.model3d.domain.ModelStorageLocation
 import com.pokemon3d.api.model3d.domain.ModelUploadRepository
 import com.pokemon3d.api.model3d.domain.UploadRejectedException
 import org.springframework.boot.WebApplicationType
@@ -19,12 +20,17 @@ fun main(args: Array<String>) {
             "submit <data-root> <manifest> <request-key> | status|activate|retry <release-id>"
         }
         SpringApplicationBuilder(Pokemon3dApplication::class.java).web(WebApplicationType.NONE).run(
-            "--spring.docker.compose.enabled=false", "--pokemon.uploads.enabled=false", "--pokemon.storage.s3.enabled=false"
+            "--spring.profiles.active=local", "--spring.docker.compose.enabled=false", "--pokemon.uploads.enabled=false",
+            "--pokemon.storage.s3.enabled=false"
         ).use { context ->
             val jobs = context.getBean(ModelUploadRepository::class.java)
             val id = if (command == "submit") {
                 val spool = Path.of(context.environment.getProperty("pokemon.uploads.spool-path", "runtime-data/uploads"))
-                ManifestDatabaseImporter(jobs, spool).submit(Path.of(args[1]), Path.of(args[2]), args[3])
+                val location = ModelStorageLocation(
+                    context.environment.getRequiredProperty("pokemon.storage.s3.bucket"),
+                    context.environment.getProperty("pokemon.storage.s3.prefix", ""),
+                )
+                ManifestDatabaseImporter(jobs, spool, location).submit(Path.of(args[1]), Path.of(args[2]), args[3])
             } else UUID.fromString(args[1])
             when (command) {
                 "activate" -> jobs.activate(id)

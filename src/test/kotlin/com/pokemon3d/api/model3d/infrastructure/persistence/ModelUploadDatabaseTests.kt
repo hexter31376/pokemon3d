@@ -33,6 +33,7 @@ open class ModelUploadDatabaseTests {
     @Autowired lateinit var transactionManager: PlatformTransactionManager
     @TempDir lateinit var root: Path
     private val lease = Duration.ofMinutes(10)
+    private val storageLocation = ModelStorageLocation("test-bucket", "test-prefix")
 
     @BeforeEach fun clean() {
         jdbc.update("UPDATE model_active_release SET release_id=NULL,revision=0")
@@ -45,7 +46,7 @@ open class ModelUploadDatabaseTests {
         val directory = Files.createDirectories(root.resolve(version))
         val (path, manifest) = createDataset(directory)
         ManifestWriter.writeAtomic(path, manifest.copy(datasetVersion = version))
-        return ManifestDatabaseImporter(jobs, root.resolve("spool")).submit(directory, path, key)
+        return ManifestDatabaseImporter(jobs, root.resolve("spool"), storageLocation).submit(directory, path, key)
     }
 
     @Test fun `stages immutable files and publishes only after verified completion and activation`() {
@@ -98,7 +99,7 @@ open class ModelUploadDatabaseTests {
         val id = submit()
         val remote = mutableSetOf<String>()
         var puts = 0
-        val publisher = ModelAssetPublisher { model, _ -> if (remote.add(model.asset.path)) puts++ }
+        val publisher = ModelAssetPublisher { model, _, _ -> if (remote.add(model.asset.path)) puts++ }
         val failing = object : ModelUploadRepository by jobs {
             override fun complete(job: UploadJob): Boolean = TransactionTemplate(transactionManager).execute<Boolean> {
                 jobs.complete(job)
@@ -145,7 +146,7 @@ open class ModelUploadDatabaseTests {
         val second = first.copy(modelId = "fixture_002", asset = first.asset.copy(path = "models/fixture_002.glb"))
         Files.copy(root.resolve(first.asset.path), root.resolve(second.asset.path))
         ManifestWriter.writeAtomic(path, manifest.copy(modelCount = 2, models = listOf(first, second)))
-        val id = ManifestDatabaseImporter(jobs, root.resolve("spool")).submit(root, path, "partial")
+        val id = ManifestDatabaseImporter(jobs, root.resolve("spool"), storageLocation).submit(root, path, "partial")
         jobs.complete(jobs.claim(lease, 1)!!)
         assertEquals(1, jobs.status(id).succeeded)
         assertEquals("UPLOADING", jobs.status(id).state)
@@ -160,7 +161,7 @@ open class ModelUploadDatabaseTests {
         val (path, _) = createDataset(root)
         Executors.newFixedThreadPool(2).use { executor ->
             val ids = executor.invokeAll(List(2) { Callable {
-                ManifestDatabaseImporter(jobs, root.resolve("spool")).submit(root, path, "same-request")
+                ManifestDatabaseImporter(jobs, root.resolve("spool"), storageLocation).submit(root, path, "same-request")
             } }).map { it.get() }
             assertEquals(ids[0], ids[1])
         }

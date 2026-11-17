@@ -4,6 +4,7 @@ import com.pokemon3d.api.model3d.application.ModelResourceService
 import com.pokemon3d.api.model3d.domain.ModelAssetPublisher
 import com.pokemon3d.api.model3d.domain.ModelAssetStorage
 import com.pokemon3d.api.model3d.domain.ModelMetadataRepository
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -22,6 +23,10 @@ class S3StorageConfiguration {
 
     @Bean
     fun modelAssetPublisher(client: S3Client, properties: S3StorageProperties): ModelAssetPublisher = S3ModelAssetPublisher(client, properties)
+
+    @Bean
+    fun legacyStorageLocationBackfill(jdbc: JdbcTemplate, properties: S3StorageProperties) =
+        LegacyStorageLocationBackfill(jdbc, properties)
 
     @Bean
     fun modelResourceService(metadata: ModelMetadataRepository, storage: ModelAssetStorage) = ModelResourceService(metadata, storage)

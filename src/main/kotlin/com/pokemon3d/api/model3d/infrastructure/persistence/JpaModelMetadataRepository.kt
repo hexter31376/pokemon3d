@@ -15,10 +15,14 @@ class JpaModelMetadataRepository(private val em: EntityManager, private val jdbc
             { rs, _ -> rs.getString(1) }).singleOrNull().orEmpty()
 
     override fun findVersionedById(modelId: String): VersionedModel? = jdbc.query(
-        """SELECT r.dataset_version,m.metadata_json FROM model_active_release a
+        """SELECT r.dataset_version,m.metadata_json,r.storage_bucket,r.storage_prefix FROM model_active_release a
             JOIN model_release r ON r.id=a.release_id JOIN model_metadata m ON m.release_id=r.id
             WHERE a.singleton=1 AND m.model_id=?""",
-        { rs, _ -> VersionedModel(rs.getString(1), MetadataCodec.decode(rs.getString(2))) }, modelId).singleOrNull()
+        { rs, _ -> VersionedModel(
+            rs.getString(1),
+            MetadataCodec.decode(rs.getString(2)),
+            ModelStorageLocation(requireNotNull(rs.getString(3)), requireNotNull(rs.getString(4))),
+        ) }, modelId).singleOrNull()
 
     override fun findById(modelId: String) = findVersionedById(modelId)?.model
     override fun findAll(): List<ModelMetadata> = query(null)

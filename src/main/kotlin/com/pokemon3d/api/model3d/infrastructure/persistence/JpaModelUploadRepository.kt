@@ -14,14 +14,17 @@ import java.util.UUID
 @Repository
 @Transactional
 class JpaModelUploadRepository(private val jdbc: JdbcTemplate, private val em: EntityManager) : ModelUploadRepository {
-    override fun register(id: UUID, requestKey: String, version: String, fingerprint: String, models: List<PreparedModel>): UUID {
+    override fun register(id: UUID, requestKey: String, version: String, fingerprint: String,
+                          storageLocation: ModelStorageLocation, models: List<PreparedModel>): UUID {
         require(requestKey.isNotBlank() && requestKey.length <= 200 && version.isNotBlank() && version.length <= 200)
+        require(storageLocation.bucket.isNotBlank()) { "Storage bucket is required" }
         require(models.isNotEmpty() && models.map { it.metadata.modelId }.distinct().size == models.size)
         // Serialize registration and activation so base_revision and idempotency are consistent.
         val revision = jdbc.queryForObject("SELECT revision FROM model_active_release WHERE singleton=1 FOR UPDATE", Long::class.java)!!
         findRequest(requestKey, fingerprint)?.let { return it }
-        jdbc.update("""INSERT INTO model_release(id,request_key,dataset_version,fingerprint,expected_count,base_revision,state)
-            VALUES (?,?,?,?,?,?,'UPLOADING')""", id, requestKey, version, fingerprint, models.size, revision)
+        jdbc.update("""INSERT INTO model_release(id,request_key,dataset_version,fingerprint,expected_count,base_revision,
+            storage_bucket,storage_prefix,state) VALUES (?,?,?,?,?,?,?,?, 'UPLOADING')""",
+            id, requestKey, version, fingerprint, models.size, revision, storageLocation.bucket, storageLocation.prefix)
         models.forEach {
             jdbc.update("""INSERT INTO model_upload_job(id,release_id,model_id,metadata_json,source_path,state)
                 VALUES (?,?,?,?,?,'PENDING')""", UUID.randomUUID(), id, it.metadata.modelId, MetadataCodec.encode(it.metadata), it.source.toString())
@@ -41,11 +44,15 @@ class JpaModelUploadRepository(private val jdbc: JdbcTemplate, private val em: E
             WHERE state='RUNNING' AND lease_until<CURRENT_TIMESTAMP AND attempts>=?""", maxAttempts)
         jdbc.update("""UPDATE model_release SET state='FAILED' WHERE state='UPLOADING'
             AND EXISTS (SELECT 1 FROM model_upload_job j WHERE j.release_id=model_release.id AND j.state='FAILED')""")
-        val job = jdbc.query("""SELECT * FROM model_upload_job WHERE attempts<? AND
-            ((state='PENDING' AND available_at<=CURRENT_TIMESTAMP) OR (state='RUNNING' AND lease_until<CURRENT_TIMESTAMP))
-            ORDER BY available_at,id LIMIT 1 FOR UPDATE SKIP LOCKED""",
+        val job = jdbc.query("""SELECT j.*,
+            (SELECT r.storage_bucket FROM model_release r WHERE r.id=j.release_id) AS storage_bucket,
+            (SELECT r.storage_prefix FROM model_release r WHERE r.id=j.release_id) AS storage_prefix
+            FROM model_upload_job j WHERE j.attempts<? AND
+            ((j.state='PENDING' AND j.available_at<=CURRENT_TIMESTAMP) OR (j.state='RUNNING' AND j.lease_until<CURRENT_TIMESTAMP))
+            ORDER BY j.available_at,j.id LIMIT 1 FOR UPDATE SKIP LOCKED""",
             { rs, _ -> UploadJob(rs.getObject("id", UUID::class.java), rs.getObject("release_id", UUID::class.java),
-                UUID.randomUUID(), MetadataCodec.decode(rs.getString("metadata_json")), Path.of(rs.getString("source_path"))) }, maxAttempts).singleOrNull() ?: return null
+                UUID.randomUUID(), MetadataCodec.decode(rs.getString("metadata_json")), Path.of(rs.getString("source_path")),
+                ModelStorageLocation(rs.getString("storage_bucket"), rs.getString("storage_prefix"))) }, maxAttempts).singleOrNull() ?: return null
         jdbc.update("""UPDATE model_upload_job SET state='RUNNING',attempts=attempts+1,lease_token=?,lease_until=? WHERE id=?""",
             job.token, Timestamp.from(databaseNow().plus(lease)), job.id)
         return job
