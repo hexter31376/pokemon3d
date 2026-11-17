@@ -7,6 +7,7 @@ import math
 import os
 from pathlib import Path, PurePosixPath
 import re
+import stat
 import struct
 import sys
 import tempfile
@@ -222,6 +223,10 @@ def extract(root, catalog, dataset_version, expected_count=None):
 
 def write_atomic(path, doc):
     path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        mode = stat.S_IMODE(path.stat().st_mode)
+    except FileNotFoundError:
+        mode = 0o644  # New manifests are readable by a separate application user.
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent, delete=False) as f:
@@ -229,6 +234,9 @@ def write_atomic(path, doc):
             json.dump(doc, f, ensure_ascii=False, indent=2, allow_nan=False)
             f.write('\n')
             f.flush()
+            if os.name == 'posix':
+                # Set access mode before publishing the replacement file.
+                os.fchmod(f.fileno(), mode)
             os.fsync(f.fileno())
         os.replace(temporary, path)
     finally:

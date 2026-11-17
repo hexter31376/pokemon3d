@@ -1,11 +1,14 @@
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
+import stat
 import struct
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from model_manifest import extract, load_json, read_glb, validate_manifest, write_atomic
@@ -66,6 +69,40 @@ class ManifestToolTests(unittest.TestCase):
         write_atomic(out, self.extract())
         self.assertEqual(first, out.read_bytes())
         self.assertEqual(validate_manifest(load_json(out)), self.extract())
+
+    @unittest.skipUnless(os.name == 'posix', 'requires POSIX file permissions')
+    def test_atomic_replacement_preserves_existing_permissions(self):
+        out = self.root / 'manifest.json'
+        for mode in (0o644, 0o640, 0o600):
+            with self.subTest(mode=oct(mode)):
+                out.write_text('{}')
+                out.chmod(mode)
+                write_atomic(out, self.doc)
+                self.assertEqual(mode, stat.S_IMODE(out.stat().st_mode))
+                self.assertEqual(self.doc, load_json(out))
+
+    @unittest.skipUnless(os.name == 'posix', 'requires POSIX file permissions')
+    def test_new_manifest_is_readable_even_with_restrictive_umask(self):
+        out = self.root / 'manifest.json'
+        previous_umask = os.umask(0o077)
+        try:
+            write_atomic(out, self.doc)
+        finally:
+            os.umask(previous_umask)
+        self.assertEqual(0o644, stat.S_IMODE(out.stat().st_mode))
+
+    @unittest.skipUnless(os.name == 'posix', 'requires POSIX file permissions')
+    def test_permission_failure_preserves_original_and_removes_temporary_file(self):
+        out = self.root / 'manifest.json'
+        out.write_text('{}')
+        out.chmod(0o640)
+        before = set(self.root.iterdir())
+        with patch('model_manifest.os.fchmod', side_effect=PermissionError('denied')):
+            with self.assertRaises(PermissionError):
+                write_atomic(out, self.doc)
+        self.assertEqual('{}', out.read_text())
+        self.assertEqual(0o640, stat.S_IMODE(out.stat().st_mode))
+        self.assertEqual(before, set(self.root.iterdir()))
 
     def test_unknown_motion_is_preserved_and_za_form_has_stable_fallback(self):
         self.gltf['animations'][0]['name'] = 'new animation'
