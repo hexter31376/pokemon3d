@@ -4,15 +4,7 @@ import com.pokemon3d.api.model3d.domain.ModelMetadataRepository
 import com.pokemon3d.api.model3d.domain.ModelMetadata
 import com.pokemon3d.api.model3d.domain.ModelBounds
 
-import java.nio.file.Files
 import java.nio.file.Path
-import tools.jackson.core.StreamReadFeature
-import tools.jackson.databind.DeserializationFeature
-import tools.jackson.databind.MapperFeature
-import tools.jackson.databind.json.JsonMapper
-import tools.jackson.module.kotlin.KotlinFeature
-import tools.jackson.module.kotlin.KotlinModule
-
 /** Loads once. No GLB reads, network access, updates, or partial fallback snapshots. */
 class JsonManifestModelMetadataRepository(path: Path) : ModelMetadataRepository {
     private val snapshot: ModelManifest
@@ -22,19 +14,7 @@ class JsonManifestModelMetadataRepository(path: Path) : ModelMetadataRepository 
 
     init {
         try {
-            val mapper = JsonMapper.builder()
-                .addModule(KotlinModule.Builder().enable(KotlinFeature.StrictNullChecks).build())
-                .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
-                .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-                .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
-                .enable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)
-                .enable(DeserializationFeature.FAIL_ON_NULL_CREATOR_PROPERTIES)
-                .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-                .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
-                .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
-                .build()
-            val manifest = Files.newInputStream(path).use { mapper.readValue(it, ModelManifest::class.java) }
-            ManifestValidator.validate(manifest)
+            val manifest = ManifestJson.read(path)
             snapshot = manifest.copy(models = immutable(manifest.models.map { model ->
                 model.copy(
                     asset = model.asset.copy(requiredExtensions = immutable(model.asset.requiredExtensions)),
