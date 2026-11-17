@@ -1,0 +1,271 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pokemon model manifest v1",
+  "$comment": "Cross-field and finite-number rules are additionally enforced by the extractor and Spring loader.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "datasetVersion",
+    "modelCount",
+    "models"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "datasetVersion": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "modelCount": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "modelId",
+          "pokedexNumber",
+          "nameKo",
+          "nameEn",
+          "form",
+          "shiny",
+          "gender",
+          "generation",
+          "asset",
+          "motions",
+          "camera"
+        ],
+        "properties": {
+          "modelId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "pokedexNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "nameKo": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "nameEn": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "form": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "kind",
+              "label"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "base",
+                  "other",
+                  "mega",
+                  "regional",
+                  "gigantamax",
+                  "primal",
+                  "eternamax"
+                ]
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            }
+          },
+          "shiny": {
+            "type": "boolean"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "shared",
+              "genderless",
+              "male",
+              "female"
+            ]
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "asset": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sizeBytes",
+              "sha256",
+              "requiredExtensions"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\\\:?%#]+\\.glb$"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "requiredExtensions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                },
+                "uniqueItems": true
+              }
+            }
+          },
+          "motions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "index",
+                "name",
+                "role",
+                "startTimeSeconds",
+                "endTimeSeconds",
+                "durationSeconds"
+              ],
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "idle",
+                    "cry",
+                    "physical_attack",
+                    "special_attack",
+                    "pose",
+                    "effect",
+                    "other"
+                  ]
+                },
+                "startTimeSeconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "endTimeSeconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "durationSeconds": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "camera": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cameraName",
+              "direction",
+              "fov",
+              "padding",
+              "target",
+              "bounds"
+            ],
+            "properties": {
+              "cameraName": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "direction": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "fov": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "exclusiveMaximum": 180
+              },
+              "padding": {
+                "type": "number",
+                "minimum": 1
+              },
+              "target": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "bounds": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "min",
+                  "max"
+                ],
+                "properties": {
+                  "min": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  },
+                  "max": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "minItems": 1
+    }
+  }
+}
