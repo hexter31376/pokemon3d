@@ -1,0 +1,32 @@
+name: 기능 제안
+description: 새 기능이나 개선할 사항을 제안해주세요.
+title: "[Feat] "
+body:
+  - type: textarea
+    id: purpose
+    attributes:
+      label: 제안 배경
+      description: 어떤 불편함이나 필요를 해결하려는지 적어주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 제안 내용
+      description: 추가하거나 바꾸고 싶은 동작을 적어주세요.
+      placeholder: 예) 모델 조회 응답에 기존 카메라 시야 정보를 포함합니다.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 완료 기준
+      description: 어떤 결과가 나오면 완료로 볼 수 있는지 적어주세요.
+      placeholder: |
+        - [ ] 필요한 정보가 응답에 포함된다.
+        - [ ] 관련 테스트가 통과한다.
+  - type: textarea
+    id: references
+    attributes:
+      label: 참고 자료
+      description: 관련 API 예시, 문서나 이슈가 있으면 적어주세요.
