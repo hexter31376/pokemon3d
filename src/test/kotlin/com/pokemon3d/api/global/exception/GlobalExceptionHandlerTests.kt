@@ -26,6 +26,14 @@ class GlobalExceptionHandlerTests {
     }
 
     @Test
+    fun `success without data serializes null data and error`() {
+        mvc.perform(get("/test/empty"))
+            .andExpect(status().isOk)
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+            .andExpect(content().json("""{"success":true,"data":null,"error":null}"""))
+    }
+
+    @Test
     fun `business exception preserves its status and code`() {
         mvc.perform(get("/test/business"))
             .andExpect(status().isConflict)
@@ -91,6 +99,9 @@ class GlobalExceptionHandlerTests {
 
     @RestController
     class TestController {
+        @GetMapping("/test/empty")
+        fun empty() = ApiResponse.success()
+
         @GetMapping("/test")
         fun get(@RequestParam("id") id: Int) = ApiResponse.success(mapOf("id" to id))
 
