@@ -26,7 +26,9 @@ class JsonManifestModelMetadataRepository(path: Path) : ModelMetadataRepository 
                 )
             }))
             byId = snapshot.models.associateBy { it.modelId }
-            byNumber = snapshot.models.groupBy { it.pokedexNumber }.mapValues { immutable(it.value) }
+            byNumber = snapshot.models
+                .groupBy { it.pokedexNumber }
+                .mapValues { immutable(it.value) }
         } catch (ex: Exception) {
             throw ManifestLoadException("Cannot load model manifest '$path': ${ex.message}", ex)
         }

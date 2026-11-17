@@ -11,8 +11,10 @@ import kotlin.test.*
 
 class JsonManifestModelMetadataRepositoryTests {
     @TempDir lateinit var temp: Path
-    private val mapper = JsonMapper.builder().build()
-    private fun fixture(): String = javaClass.getResource("/manifest/valid.json")!!.readText()
+    private val mapper = JsonMapper.builder()
+        .build()
+    private fun fixture(): String = javaClass.getResource("/manifest/valid.json")!!
+        .readText()
     private fun write(text: String): Path = Files.writeString(temp.resolve("manifest.json"), text)
     private fun modified(change: (ObjectNode) -> Unit): Path {
         val doc = mapper.readTree(fixture()) as ObjectNode
@@ -48,12 +50,15 @@ class JsonManifestModelMetadataRepositoryTests {
         val path = write(fixture())
         val repository = JsonManifestModelMetadataRepository(path)
         assertFailsWith<UnsupportedOperationException> { (repository.findAll() as MutableList).clear() }
-        val model = repository.findAll().single()
+        val model = repository.findAll()
+            .single()
         assertFailsWith<UnsupportedOperationException> { (model.camera.direction as MutableList)[0] = 99.0 }
         assertFailsWith<UnsupportedOperationException> { (model.motions as MutableList).clear() }
         assertFailsWith<UnsupportedOperationException> { (model.asset.requiredExtensions as MutableList).clear() }
         Files.writeString(path, "invalid")
-        assertEquals("fixture_001", repository.findAll().single().modelId)
+        val loadedModel = repository.findAll()
+            .single()
+        assertEquals("fixture_001", loadedModel.modelId)
     }
 
     @Test
@@ -91,13 +96,38 @@ class JsonManifestModelMetadataRepositoryTests {
     @Test
     fun `rejects invalid camera vectors fov padding bounds and target`() {
         val changes: List<Pair<String, (ObjectNode) -> Unit>> = listOf(
-            "direction" to { it.putArray("direction").add(0).add(0).add(0) },
-            "direction" to { it.putArray("direction").add(0).add(1).add(0) },
-            "target" to { it.putArray("target").add(0).add(1) },
-            "target" to { it.putArray("target").add(100).add(100).add(100) },
+            "direction" to {
+                it.putArray("direction")
+                    .add(0)
+                    .add(0)
+                    .add(0)
+            },
+            "direction" to {
+                it.putArray("direction")
+                    .add(0)
+                    .add(1)
+                    .add(0)
+            },
+            "target" to {
+                it.putArray("target")
+                    .add(0)
+                    .add(1)
+            },
+            "target" to {
+                it.putArray("target")
+                    .add(100)
+                    .add(100)
+                    .add(100)
+            },
             "fov" to { it.put("fov", 180) },
             "padding" to { it.put("padding", 0) },
-            "bounds" to { (it["bounds"] as ObjectNode).putArray("min").add(2).add(3).add(2) },
+            "bounds" to {
+                (it["bounds"] as ObjectNode)
+                    .putArray("min")
+                    .add(2)
+                    .add(3)
+                    .add(2)
+            },
         )
         for ((reason, change) in changes) {
             fails(modified { change(model(it)["camera"] as ObjectNode) }, reason)
@@ -106,7 +136,13 @@ class JsonManifestModelMetadataRepositoryTests {
 
     @Test
     fun `rejects unsafe asset paths and invalid motion duration`() {
-        fails(modified { (model(it)["asset"] as ObjectNode).put("path", "../secret.glb") }, "asset.path")
+        fails(
+            modified {
+                val asset = model(it)["asset"] as ObjectNode
+                asset.put("path", "../secret.glb")
+            },
+            "asset.path",
+        )
         fails(modified { (model(it)["motions"][0] as ObjectNode).put("durationSeconds", -1) }, "motions[0]")
     }
 }

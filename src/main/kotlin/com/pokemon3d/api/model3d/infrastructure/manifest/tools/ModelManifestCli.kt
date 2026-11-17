@@ -10,10 +10,14 @@ internal object ModelManifestCli {
         val options = mutableMapOf<String, String>()
         val allowed = setOf("--data-root", "--catalog", "--manifest", "--dataset-version", "--expected-count")
         require((args.size - 1) % 2 == 0) { "Options must be --name value pairs" }
-        args.drop(1).chunked(2).forEach { (key, value) ->
-            require(key in allowed && key !in options && value.isNotBlank()) { "Invalid or duplicate option: $key" }
-            options[key] = value
-        }
+        args.drop(1)
+            .chunked(2)
+            .forEach { (key, value) ->
+                require(key in allowed && key !in options && value.isNotBlank()) {
+                    "Invalid or duplicate option: $key"
+                }
+                options[key] = value
+            }
         fun option(key: String): String = requireNotNull(options[key]) { "Missing $key" }
         val root = Path.of(option("--data-root"))
         val catalog = Path.of(option("--catalog"))
@@ -23,11 +27,19 @@ internal object ModelManifestCli {
         }
         val extractor = GlbMetadataExtractor()
         val result = if (args[0] == "extract") {
-            require(manifest.toAbsolutePath().normalize() != catalog.toAbsolutePath().normalize()
-                && manifest.toString().endsWith(".json")) { "Output must be a separate JSON file" }
-            extractor.extract(root, catalog, option("--dataset-version"), count).also {
-                ManifestWriter.writeAtomic(manifest, it)
-            }
+            val normalizedManifest = manifest.toAbsolutePath()
+                .normalize()
+            val normalizedCatalog = catalog.toAbsolutePath()
+                .normalize()
+            val isJsonOutput = manifest.toString()
+                .endsWith(".json")
+            require(
+                normalizedManifest != normalizedCatalog && isJsonOutput,
+            ) { "Output must be a separate JSON file" }
+            extractor.extract(root, catalog, option("--dataset-version"), count)
+                .also {
+                    ManifestWriter.writeAtomic(manifest, it)
+                }
         } else {
             val actual = ManifestJson.read(manifest)
             val expected = extractor.extract(root, catalog, actual.datasetVersion, count)

@@ -11,8 +11,12 @@ import tools.jackson.module.kotlin.KotlinModule
 
 /** Strict parsing and validation for offline extraction and database import. */
 internal object ManifestJson {
-    val mapper = JsonMapper.builder()
-        .addModule(KotlinModule.Builder().enable(KotlinFeature.StrictNullChecks).build())
+    val mapper: JsonMapper = JsonMapper.builder()
+        .addModule(
+            KotlinModule.Builder()
+                .enable(KotlinFeature.StrictNullChecks)
+                .build(),
+        )
         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
         .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
         .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
@@ -23,7 +27,9 @@ internal object ManifestJson {
         .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
         .build()
 
-    fun read(path: Path): ModelManifest = Files.newInputStream(path).use {
-        mapper.readValue(it, ModelManifest::class.java).also(ManifestValidator::validate)
-    }
+    fun read(path: Path): ModelManifest =
+        Files.newInputStream(path).use { input ->
+            mapper.readValue(input, ModelManifest::class.java)
+                .also(ManifestValidator::validate)
+        }
 }

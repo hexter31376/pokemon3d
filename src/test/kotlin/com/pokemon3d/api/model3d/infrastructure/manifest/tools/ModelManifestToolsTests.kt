@@ -44,24 +44,45 @@ class ModelManifestToolsTests {
         writeGlb(); writeCatalog()
     }
 
-    private fun writeCatalog() { Files.writeString(catalog, mapper.writeValueAsString(listOf(entry))) }
+    private fun writeCatalog() {
+        Files.writeString(catalog, mapper.writeValueAsString(listOf(entry)))
+    }
     private fun writeGlb() {
         val json = mapper.writeValueAsBytes(gltf)
         val padding = (4 - json.size % 4) % 4
-        val buffer = ByteBuffer.allocate(20 + json.size + padding).order(ByteOrder.LITTLE_ENDIAN)
-        buffer.putInt(0x46546c67).putInt(2).putInt(buffer.capacity()).putInt(json.size + padding).putInt(0x4e4f534a)
+        val buffer = ByteBuffer.allocate(20 + json.size + padding)
+            .order(ByteOrder.LITTLE_ENDIAN)
+        buffer.putInt(0x46546c67)
+            .putInt(2)
+            .putInt(buffer.capacity())
+            .putInt(json.size + padding)
+            .putInt(0x4e4f534a)
         buffer.put(json); repeat(padding) { buffer.put(32) }
         Files.write(glb, buffer.array())
     }
     private fun extract() = extractor.extract(root, catalog, "fixture-v1", 1)
-    private fun cli(command: String) = arrayOf(command, "--data-root", root.toString(), "--catalog", catalog.toString(),
-        "--manifest", output.toString(), "--expected-count", "1")
+    private fun cli(command: String) = arrayOf(
+        command,
+        "--data-root",
+        root.toString(),
+        "--catalog",
+        catalog.toString(),
+        "--manifest",
+        output.toString(),
+        "--expected-count",
+        "1",
+    )
 
     @Test
     fun `extracts actual size hash times role and camera`() {
-        val model = extract().models.single()
+        val model = extract()
+            .models
+            .single()
         assertEquals(Files.size(glb), model.asset.sizeBytes)
-        assertEquals(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(glb)).joinToString("") { "%02x".format(it) }, model.asset.sha256)
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(Files.readAllBytes(glb))
+            .joinToString("") { "%02x".format(it) }
+        assertEquals(digest, model.asset.sha256)
         assertEquals(1.0, model.motions.single().startTimeSeconds)
         assertEquals(2.0, model.motions.single().durationSeconds)
         assertEquals("idle", model.motions.single().role)
@@ -83,7 +104,9 @@ class ModelManifestToolsTests {
     fun `unknown animation and missing source form code are preserved`() {
         (gltf["animations"][0] as ObjectNode).put("name", "new animation")
         entry.putNull("formCode"); writeCatalog(); writeGlb()
-        val model = extract().models.single()
+        val model = extract()
+            .models
+            .single()
         assertEquals("other", model.motions.single().role)
         assertEquals("fixture_001", model.form.code)
     }
@@ -114,10 +137,20 @@ class ModelManifestToolsTests {
         val before = extract()
         // Add a valid unknown chunk: metadata stays identical but bytes differ.
         val original = Files.readAllBytes(glb)
-        val updated = ByteBuffer.allocate(original.size + 12).order(ByteOrder.LITTLE_ENDIAN)
-        updated.put(original).putInt(4).putInt(0x12345678).putInt(0)
+        val updated = ByteBuffer.allocate(original.size + 12)
+            .order(ByteOrder.LITTLE_ENDIAN)
+        updated.put(original)
+            .putInt(4)
+            .putInt(0x12345678)
+            .putInt(0)
         updated.putInt(8, updated.capacity()); Files.write(glb, updated.array())
-        assertNotEquals(before.models.single().asset.sha256, extract().models.single().asset.sha256)
+        val previousHash = before.models
+            .single()
+            .asset.sha256
+        val currentHash = extract().models
+            .single()
+            .asset.sha256
+        assertNotEquals(previousHash, currentHash)
         assertFailsWith<IllegalArgumentException> { ModelManifestCli.run(cli("verify")) }
     }
 
@@ -134,10 +167,19 @@ class ModelManifestToolsTests {
 
     @Test
     fun `schema and reader enforce Int and Long boundaries`() {
-        val model = extract().models.single()
-        val manifest = extract().copy(models = listOf(model.copy(asset = model.asset.copy(sizeBytes = Long.MAX_VALUE))))
+        val model = extract()
+            .models
+            .single()
+        val largestAsset = model.asset.copy(sizeBytes = Long.MAX_VALUE)
+        val manifest = extract()
+            .copy(models = listOf(model.copy(asset = largestAsset)))
         ManifestWriter.writeAtomic(output, manifest)
-        assertEquals(Long.MAX_VALUE, ManifestJson.read(output).models.single().asset.sizeBytes)
+        val loadedAssetSize = ManifestJson.read(output)
+            .models
+            .single()
+            .asset
+            .sizeBytes
+        assertEquals(Long.MAX_VALUE, loadedAssetSize)
         val original = mapper.readTree(output.toFile()) as ObjectNode
         for (field in listOf("generation", "pokedexNumber")) {
             val doc = original.deepCopy()
@@ -145,8 +187,10 @@ class ModelManifestToolsTests {
             Files.writeString(output, mapper.writeValueAsString(doc))
             assertFails { ManifestJson.read(output) }
         }
-        (original["models"][0]["asset"] as ObjectNode).put("sizeBytes", java.math.BigInteger("9223372036854775808"))
-        Files.writeString(output, mapper.writeValueAsString(original)); assertFails { ManifestJson.read(output) }
+        val originalAsset = original["models"][0]["asset"] as ObjectNode
+        originalAsset.put("sizeBytes", java.math.BigInteger("9223372036854775808"))
+        Files.writeString(output, mapper.writeValueAsString(original))
+        assertFails { ManifestJson.read(output) }
         val schema = mapper.readTree(Path.of("docs/model-manifest.schema.json").toFile())
         val properties = schema["properties"]["models"]["items"]["properties"]
         assertEquals(Int.MAX_VALUE.toLong(), properties["generation"]["maximum"].longValue())
@@ -174,7 +218,13 @@ class ModelManifestToolsTests {
         val marker = Files.writeString(output.resolve("keep"), "original")
         assertFails { ManifestWriter.writeAtomic(output, extract()) }
         assertEquals("original", Files.readString(marker))
-        Files.list(root).use { paths -> assertFalse(paths.anyMatch { it.fileName.toString().startsWith(".manifest-") }) }
+        Files.list(root)
+            .use { paths ->
+                assertFalse(paths.anyMatch { path ->
+                    val fileName = path.fileName.toString()
+                    fileName.startsWith(".manifest-")
+                })
+        }
     }
 
     @Test
