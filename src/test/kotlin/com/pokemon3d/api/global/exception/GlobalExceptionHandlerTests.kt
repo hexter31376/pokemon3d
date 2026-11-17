@@ -17,11 +17,15 @@ import org.springframework.web.bind.annotation.*
 
 class GlobalExceptionHandlerTests {
     private val mvc = MockMvcBuilders.standaloneSetup(TestController())
-        .setControllerAdvice(GlobalExceptionHandler()).build()
+        .setControllerAdvice(GlobalExceptionHandler())
+        .build()
 
     @Test
     fun `success response contains data`() {
-        mvc.perform(get("/test").param("id", "1"))
+        mvc.perform(
+            get("/test")
+                .param("id", "1"),
+        )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.id").value(1))
@@ -30,9 +34,11 @@ class GlobalExceptionHandlerTests {
 
     @Test
     fun `success without data serializes null data and error`() {
+        val jsonContentType = content()
+            .contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
         mvc.perform(get("/test/empty"))
             .andExpect(status().isOk)
-            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+            .andExpect(jsonContentType)
             .andExpect(content().json("""{"success":true,"data":null,"error":null}"""))
     }
 
@@ -55,22 +61,35 @@ class GlobalExceptionHandlerTests {
 
     @Test
     fun `missing and malformed parameters are bad requests`() {
-        for (request in listOf(get("/test"), get("/test").param("id", "abc"))) {
-            mvc.perform(request).andExpect(status().isBadRequest)
+        val requests = listOf(
+            get("/test"),
+            get("/test").param("id", "abc"),
+        )
+        for (request in requests) {
+            mvc.perform(request)
+                .andExpect(status().isBadRequest)
                 .andExpect(jsonPath("$.error.code").value("COMMON_001"))
         }
     }
 
     @Test
     fun `malformed JSON has its own code`() {
-        mvc.perform(post("/test").contentType(MediaType.APPLICATION_JSON).content("{"))
+        mvc.perform(
+            post("/test")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{"),
+        )
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.error.code").value("COMMON_002"))
     }
 
     @Test
     fun `validation includes field errors`() {
-        mvc.perform(post("/test").contentType(MediaType.APPLICATION_JSON).content("""{"name":""}"""))
+        mvc.perform(
+            post("/test")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":""}"""),
+        )
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.error.code").value("COMMON_001"))
             .andExpect(jsonPath("$.error.fields[0].field").value("name"))
@@ -88,7 +107,11 @@ class GlobalExceptionHandlerTests {
 
     @Test
     fun `unsupported content type remains 415`() {
-        mvc.perform(post("/test").contentType(MediaType.TEXT_PLAIN).content("hello"))
+        mvc.perform(
+            post("/test")
+                .contentType(MediaType.TEXT_PLAIN)
+                .content("hello"),
+        )
             .andExpect(status().isUnsupportedMediaType)
             .andExpect(jsonPath("$.error.code").value("COMMON_009"))
     }
@@ -102,7 +125,10 @@ class GlobalExceptionHandlerTests {
 
     @Test
     fun `constrained request parameter includes public name and message`() {
-        mvc.perform(get("/test/constrained").param("pokemonId", "0"))
+        mvc.perform(
+            get("/test/constrained")
+                .param("pokemonId", "0"),
+        )
             .andExpect(status().isBadRequest)
             .andExpect { assertIs<HandlerMethodValidationException>(it.resolvedException) }
             .andExpect(jsonPath("$.error.code").value("COMMON_001"))
@@ -112,8 +138,12 @@ class GlobalExceptionHandlerTests {
 
     @Test
     fun `method validation preserves request body field details`() {
-        mvc.perform(post("/test/constrained-body").param("id", "1")
-            .contentType(MediaType.APPLICATION_JSON).content("""{"name":""}"""))
+        mvc.perform(
+            post("/test/constrained-body")
+                .param("id", "1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":""}"""),
+        )
             .andExpect(status().isBadRequest)
             .andExpect { assertIs<HandlerMethodValidationException>(it.resolvedException) }
             .andExpect(jsonPath("$.error.code").value("COMMON_001"))

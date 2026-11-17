@@ -1,7 +1,8 @@
 package com.pokemon3d.api.model3d.infrastructure.storage.s3
 
 import com.pokemon3d.api.model3d.application.ModelResourceService
-import com.pokemon3d.api.model3d.application.ModelResourceNotFoundException
+import com.pokemon3d.api.model3d.application.ModelAssetNotFoundException
+import com.pokemon3d.api.model3d.application.ModelNotFoundException
 import com.pokemon3d.api.model3d.domain.*
 import com.pokemon3d.api.model3d.infrastructure.manifest.JsonManifestModelMetadataRepository
 import com.pokemon3d.api.model3d.presentation.ModelResourceExceptionHandler
@@ -26,7 +27,16 @@ import java.util.UUID
 import kotlin.test.*
 
 internal fun properties(endpoint: String = "http://internal-storage:8333", publicUrl: String = "https://assets.example.test/bucket") =
-    S3StorageProperties(true, endpoint, publicUrl, "us-east-1", "test-bucket", "pokemon", UUID.randomUUID().toString(), UUID.randomUUID().toString())
+    S3StorageProperties(
+        true,
+        endpoint,
+        publicUrl,
+        "us-east-1",
+        "test-bucket",
+        "pokemon",
+        UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(),
+    )
 
 class StorageUnitTests {
     @Test
@@ -58,67 +68,102 @@ class StorageUnitTests {
             assertFailsWith<IllegalArgumentException> { PublicAssetUrlResolver(url) }
         }
         assertFailsWith<IllegalArgumentException> { S3StorageProperties(enabled = true).validate() }
-        assertFalse(properties().toString().contains("secretKey"))
+        val propertyText = properties().toString()
+        assertFalse(propertyText.contains("secretKey"))
     }
 
     @Test
     fun `missing object is null only after bucket check succeeds`() {
         val client = mock(S3Client::class.java)
-        `when`(client.headObject(any(HeadObjectRequest::class.java))).thenThrow(S3Exception.builder().statusCode(404).build())
-        `when`(client.headBucket(any(HeadBucketRequest::class.java))).thenReturn(HeadBucketResponse.builder().build())
+        `when`(client.headObject(any(HeadObjectRequest::class.java)))
+            .thenThrow(
+                S3Exception.builder()
+                    .statusCode(404)
+                    .build(),
+            )
+        `when`(client.headBucket(any(HeadBucketRequest::class.java)))
+            .thenReturn(HeadBucketResponse.builder().build())
         assertNull(S3ObjectStore(client, "bucket").head("missing"))
-        verify(client).headBucket(any(HeadBucketRequest::class.java))
+        val verifiedClient = verify(client)
+        verifiedClient.headBucket(any(HeadBucketRequest::class.java))
     }
 
     @Test
     fun `missing bucket authorization and connection failures stay distinct`() {
         val client = mock(S3Client::class.java)
         val objects = S3ObjectStore(client, "bucket")
-        `when`(client.headObject(any(HeadObjectRequest::class.java))).thenThrow(S3Exception.builder().statusCode(404).build())
-        `when`(client.headBucket(any(HeadBucketRequest::class.java))).thenThrow(S3Exception.builder().statusCode(404).build())
+        `when`(client.headObject(any(HeadObjectRequest::class.java)))
+            .thenThrow(
+                S3Exception.builder()
+                    .statusCode(404)
+                    .build(),
+            )
+        `when`(client.headBucket(any(HeadBucketRequest::class.java)))
+            .thenThrow(
+                S3Exception.builder()
+                    .statusCode(404)
+                    .build(),
+            )
         assertEquals(StorageFailure.BUCKET_NOT_FOUND, assertFailsWith<ModelStorageException> { objects.head("x") }.failure)
-        `when`(client.headObject(any(HeadObjectRequest::class.java))).thenThrow(S3Exception.builder().statusCode(403).build())
+        `when`(client.headObject(any(HeadObjectRequest::class.java)))
+            .thenThrow(
+                S3Exception.builder()
+                    .statusCode(403)
+                    .build(),
+            )
         assertEquals(StorageFailure.ACCESS_DENIED, assertFailsWith<ModelStorageException> { objects.head("x") }.failure)
-        `when`(client.headObject(any(HeadObjectRequest::class.java))).thenThrow(SdkClientException.create("connection failed"))
+        `when`(client.headObject(any(HeadObjectRequest::class.java)))
+            .thenThrow(SdkClientException.create("connection failed"))
         assertEquals(StorageFailure.UNAVAILABLE, assertFailsWith<ModelStorageException> { objects.head("x") }.failure)
     }
 
     @Test
     fun `application combines metadata and URL and rejects missing or inconsistent storage`() {
-        val manifestRepository = JsonManifestModelMetadataRepository(Path.of(javaClass.getResource("/manifest/valid.json")!!.toURI()))
+        val manifestPath = Path.of(javaClass.getResource("/manifest/valid.json")!!.toURI())
+        val manifestRepository = JsonManifestModelMetadataRepository(manifestPath)
         val location = ModelStorageLocation("fixture-bucket", "fixture-prefix")
         val repository = object : ModelMetadataRepository by manifestRepository {
             override fun findVersionedById(modelId: String) = manifestRepository.findById(modelId)?.let {
                 VersionedModel(manifestRepository.datasetVersion, it, location)
             }
         }
-        val asset = repository.findAll().single().asset
+        val asset = repository.findAll()
+            .single()
+            .asset
         val storage = mock(ModelAssetStorage::class.java)
         val service = ModelResourceService(repository, storage)
-        assertFalse(assertFailsWith<ModelResourceNotFoundException> { service.findById("absent") }.missingAsset)
-        assertTrue(assertFailsWith<ModelResourceNotFoundException> { service.findById("fixture_001") }.missingAsset)
-        `when`(storage.find(asset, location)).thenReturn(StoredModelAsset(asset.sizeBytes, "text/plain", asset.sha256))
+        assertFailsWith<ModelNotFoundException> { service.findById("absent") }
+        assertFailsWith<ModelAssetNotFoundException> { service.findById("fixture_001") }
+        `when`(storage.find(asset, location))
+            .thenReturn(StoredModelAsset(asset.sizeBytes, "text/plain", asset.sha256))
         assertEquals(StorageFailure.INTEGRITY_MISMATCH, assertFailsWith<ModelStorageException> { service.findById("fixture_001") }.failure)
-        `when`(storage.find(asset, location)).thenReturn(StoredModelAsset(asset.sizeBytes, "model/gltf-binary", asset.sha256))
-        `when`(storage.publicUrl(asset, location)).thenReturn(URI("https://assets.example.test/a.glb"))
+        `when`(storage.find(asset, location))
+            .thenReturn(StoredModelAsset(asset.sizeBytes, "model/gltf-binary", asset.sha256))
+        `when`(storage.publicUrl(asset, location))
+            .thenReturn(URI("https://assets.example.test/a.glb"))
         assertEquals("fixture-v1", service.findById("fixture_001").datasetVersion)
     }
 
     @Test
     fun `disabled storage creates no client and enabled invalid settings fail fast`() {
-        val runner = ApplicationContextRunner().withUserConfiguration(S3StorageConfiguration::class.java)
+        val runner = ApplicationContextRunner()
+            .withUserConfiguration(S3StorageConfiguration::class.java)
         runner.run { assertNull(it.startupFailure); assertFalse(it.containsBean("modelS3Client")) }
-        runner.withPropertyValues("pokemon.storage.s3.enabled=true").run { assertNotNull(it.startupFailure) }
+        runner.withPropertyValues("pokemon.storage.s3.enabled=true")
+            .run { assertNotNull(it.startupFailure) }
     }
 
     @Test
     fun `storage exceptions use public error codes instead of leaking internal failures`() {
         val mvc = MockMvcBuilders.standaloneSetup(FailureController())
-            .setControllerAdvice(ModelResourceExceptionHandler(), GlobalExceptionHandler()).build()
-        mvc.perform(get("/storage-failure")).andExpect(status().isServiceUnavailable)
+            .setControllerAdvice(ModelResourceExceptionHandler(), GlobalExceptionHandler())
+            .build()
+        mvc.perform(get("/storage-failure"))
+            .andExpect(status().isServiceUnavailable)
             .andExpect(jsonPath("$.error.code").value("MODEL3D_003"))
             .andExpect(jsonPath("$.error.message").value("모델 저장소를 이용할 수 없습니다."))
-        mvc.perform(get("/asset-missing")).andExpect(status().isNotFound)
+        mvc.perform(get("/asset-missing"))
+            .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.error.code").value("MODEL3D_002"))
     }
 
@@ -131,6 +176,6 @@ class StorageUnitTests {
             IllegalStateException("private error details")
         )
         @GetMapping("/asset-missing")
-        fun missing(): Unit = throw ModelResourceNotFoundException("missing", true)
+        fun missing(): Unit = throw ModelAssetNotFoundException("missing")
     }
 }

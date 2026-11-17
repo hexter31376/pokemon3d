@@ -1,26 +1,32 @@
 package com.pokemon3d.api.model3d.infrastructure.storage.s3
 
+import com.pokemon3d.api.model3d.infrastructure.persistence.ModelReleaseEntity
 import org.springframework.beans.factory.SmartInitializingSingleton
-import org.springframework.jdbc.core.JdbcTemplate
+import jakarta.persistence.EntityManager
+import org.springframework.transaction.annotation.Transactional
 
 /** Pins existing releases to the storage coordinates in use during their first upgraded startup. */
-class LegacyStorageLocationBackfill(
-    private val jdbc: JdbcTemplate,
+open class LegacyStorageLocationBackfill(
+    private val entityManager: EntityManager,
     private val properties: S3StorageProperties,
 ) : SmartInitializingSingleton {
+    @Transactional
     override fun afterSingletonsInstantiated() {
-        val missing = jdbc.queryForObject(
-            "SELECT COUNT(*) FROM model_release WHERE storage_bucket IS NULL OR storage_prefix IS NULL",
-            Int::class.java,
-        ) ?: 0
-        if (missing == 0) return
+        val releasesMissingStorageLocation = entityManager
+            .createQuery(
+                """
+                select release from ModelReleaseEntity release
+                where release.storageBucket is null or release.storagePrefix is null
+                """.trimIndent(),
+                ModelReleaseEntity::class.java,
+            )
+            .resultList
+        if (releasesMissingStorageLocation.isEmpty()) return
 
         require(properties.bucket.isNotBlank()) { "Cannot pin legacy releases without a configured storage bucket" }
-        jdbc.update(
-            """UPDATE model_release SET storage_bucket=COALESCE(storage_bucket,?),
-                storage_prefix=COALESCE(storage_prefix,?) WHERE storage_bucket IS NULL OR storage_prefix IS NULL""",
-            properties.bucket,
-            properties.prefix,
-        )
+        releasesMissingStorageLocation.forEach { release ->
+            if (release.storageBucket == null) release.storageBucket = properties.bucket
+            if (release.storagePrefix == null) release.storagePrefix = properties.prefix
+        }
     }
 }

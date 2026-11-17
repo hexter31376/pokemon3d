@@ -15,13 +15,16 @@ class S3ModelAssetStorage(private val client: S3Client, properties: S3StoragePro
 
     override fun find(asset: ModelAsset, storageLocation: ModelStorageLocation): StoredModelAsset? {
         requireCompatibleBucket(storageLocation, asset)
-        val objectKey = ObjectKeyResolver(storageLocation.prefix).resolve(asset.path)
-        return S3ObjectStore(client, storageLocation.bucket).head(objectKey)
+        val objectKey = ObjectKeyResolver(storageLocation.prefix)
+            .resolve(asset.path)
+        return S3ObjectStore(client, storageLocation.bucket)
+            .head(objectKey)
     }
 
     override fun publicUrl(asset: ModelAsset, storageLocation: ModelStorageLocation): URI {
         requireCompatibleBucket(storageLocation, asset)
-        val objectKey = ObjectKeyResolver(storageLocation.prefix).resolve(asset.path)
+        val objectKey = ObjectKeyResolver(storageLocation.prefix)
+            .resolve(asset.path)
         return urls.resolve(objectKey)
     }
 

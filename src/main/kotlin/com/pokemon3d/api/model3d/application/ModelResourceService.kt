@@ -1,7 +1,6 @@
 package com.pokemon3d.api.model3d.application
 
 import com.pokemon3d.api.model3d.domain.*
-import com.pokemon3d.api.model3d.domain.ModelMetadata
 import com.pokemon3d.api.model3d.domain.exception.ModelStorageException
 import com.pokemon3d.api.model3d.domain.exception.StorageFailure
 import java.net.URI
@@ -12,16 +11,25 @@ class ModelResourceService(
     private val storage: ModelAssetStorage,
 ) {
     fun findById(modelId: String): ModelResource {
-        val found = metadata.findVersionedById(modelId) ?: throw ModelResourceNotFoundException(modelId, false)
-        val model = found.model
-        val stored = storage.find(model.asset, found.storageLocation) ?: throw ModelResourceNotFoundException(modelId, true)
-        if (!stored.matches(model.asset)) {
+        val versionedModel = metadata.findVersionedById(modelId) ?: throw ModelNotFoundException(modelId)
+        val model = versionedModel.model
+        val storedAsset = storage.find(model.asset, versionedModel.storageLocation)
+            ?: throw ModelAssetNotFoundException(modelId)
+        if (!storedAsset.matches(model.asset)) {
             throw ModelStorageException(StorageFailure.INTEGRITY_MISMATCH, model.asset.path)
         }
-        return ModelResource(found.datasetVersion, model, storage.publicUrl(model.asset, found.storageLocation))
+        return ModelResource(
+            versionedModel.datasetVersion,
+            model,
+            storage.publicUrl(model.asset, versionedModel.storageLocation),
+        )
     }
 }
 
 data class ModelResource(val datasetVersion: String, val model: ModelMetadata, val fileUrl: URI)
-class ModelResourceNotFoundException(val modelId: String, val missingAsset: Boolean) :
-    RuntimeException("${if (missingAsset) "Asset" else "Model"} not found: $modelId")
+
+sealed class ModelResourceNotFoundException(message: String) : RuntimeException(message)
+
+class ModelNotFoundException(val modelId: String) : ModelResourceNotFoundException("Model not found: $modelId")
+
+class ModelAssetNotFoundException(val modelId: String) : ModelResourceNotFoundException("Asset not found: $modelId")

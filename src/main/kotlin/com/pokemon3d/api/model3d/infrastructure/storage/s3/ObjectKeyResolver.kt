@@ -10,22 +10,38 @@ class ObjectKeyResolver(prefix: String) {
 
     fun resolve(relativePath: String): String {
         validate(relativePath)
-        return listOf(prefix, relativePath).filter { it.isNotEmpty() }.joinToString("/")
+        return listOf(prefix, relativePath)
+            .filter { it.isNotEmpty() }
+            .joinToString("/")
     }
 
     private fun validate(path: String) {
-        require(path.split('/').none { it.isBlank() || it == "." || it == ".." }
-            && path.none { it == '\\' || it == ':' || it == '%' || it.isISOControl() }) { "Invalid relative object path" }
+        val segments = path.split('/')
+        require(hasSafeSegments(segments) && hasSafeCharacters(path)) {
+            "Invalid relative object path"
+        }
     }
+
+    private fun hasSafeSegments(segments: List<String>): Boolean =
+        segments.none { it.isBlank() || it == "." || it == ".." }
+
+    private fun hasSafeCharacters(path: String): Boolean =
+        path.none { it == '\\' || it == ':' || it == '%' || it.isISOControl() }
 }
 
 class PublicAssetUrlResolver(publicBaseUrl: String) {
-    private val base = S3StorageProperties.validateUrl(publicBaseUrl, "public-base-url").toASCIIString().trimEnd('/')
+    private val base = S3StorageProperties.validateUrl(publicBaseUrl, "public-base-url")
+        .toASCIIString()
+        .trimEnd('/')
     fun resolve(key: String): URI {
-        ObjectKeyResolver("").resolve(key)
-        val encoded = key.split('/').joinToString("/") {
-            URLEncoder.encode(it, StandardCharsets.UTF_8).replace("+", "%20").replace("*", "%2A")
-        }
+        ObjectKeyResolver("")
+            .resolve(key)
+        val encoded = key.split('/')
+            .joinToString("/") { segment ->
+                URLEncoder.encode(segment, StandardCharsets.UTF_8)
+                    .replace("+", "%20")
+                    .replace("*", "%2A")
+            }
         return URI("$base/$encoded")
     }
 }

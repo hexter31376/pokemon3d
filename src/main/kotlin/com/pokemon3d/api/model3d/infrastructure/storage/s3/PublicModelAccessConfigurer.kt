@@ -10,8 +10,14 @@ import tools.jackson.databind.json.JsonMapper
 class PublicModelAccessConfigurer(
     private val client: S3Client,
     private val properties: S3StorageProperties,
-    private val json: JsonMapper = JsonMapper.builder().build(),
+    private val json: JsonMapper = JsonMapper.builder()
+        .build(),
 ) {
+    private companion object {
+        const val POLICY_SID = "Pokemon3dPublicModelRead"
+        const val CORS_RULE_ID = "Pokemon3dPublicModelCors"
+    }
+
     fun configure() {
         properties.validate()
         configureBucketPolicy()
@@ -20,18 +26,22 @@ class PublicModelAccessConfigurer(
 
     private fun configureBucketPolicy() {
         val current = try {
-            client.getBucketPolicy { it.bucket(properties.bucket) }.policy()
+            client.getBucketPolicy { it.bucket(properties.bucket) }
+                .policy()
         } catch (ex: S3Exception) {
             if (ex.statusCode() == 404 || ex.awsErrorDetails()?.errorCode() == "NoSuchBucketPolicy") null else throw ex
         }
         client.putBucketPolicy {
-            it.bucket(properties.bucket).policy(mergePolicy(current))
+            it.bucket(properties.bucket)
+                .policy(mergePolicy(current))
         }
     }
 
     private fun mergePolicy(current: String?): String {
         val policy = if (current == null) linkedMapOf<String, Any?>("Version" to "2012-10-17") else {
-            json.readValue(current, Map::class.java).entries.associateTo(linkedMapOf()) { it.key.toString() to it.value }
+            json.readValue(current, Map::class.java)
+                .entries
+                .associateTo(linkedMapOf()) { it.key.toString() to it.value }
         }
         require(policy["Version"] == "2012-10-17") { "Unsupported S3 bucket policy version" }
         val statements = when (val value = policy["Statement"]) {
@@ -39,12 +49,14 @@ class PublicModelAccessConfigurer(
             is List<*> -> value.map { it as? Map<*, *> ?: error("Invalid statement in S3 bucket policy") }
             is Map<*, *> -> listOf(value)
             else -> error("Invalid Statement in S3 bucket policy")
-        }.filterNot { it["Sid"] == POLICY_SID }
+        }
+            .filterNot { it["Sid"] == POLICY_SID }
 
         val modelObjectPatterns = listOf(
             "releases/*/models/*/*.glb",
             "*/releases/*/models/*/*.glb",
-        ).map { "arn:aws:s3:::${properties.bucket}/$it" }
+        )
+            .map { "arn:aws:s3:::${properties.bucket}/$it" }
         val publicModelRead = linkedMapOf(
             "Sid" to POLICY_SID,
             "Effect" to "Allow",
@@ -58,7 +70,8 @@ class PublicModelAccessConfigurer(
 
     private fun configureCors() {
         val currentRules = try {
-            client.getBucketCors { it.bucket(properties.bucket) }.corsRules()
+            client.getBucketCors { it.bucket(properties.bucket) }
+                .corsRules()
         } catch (ex: S3Exception) {
             if (ex.statusCode() == 404 || ex.awsErrorDetails()?.errorCode() == "NoSuchCORSConfiguration") emptyList() else throw ex
         }
@@ -72,12 +85,12 @@ class PublicModelAccessConfigurer(
             .build()
         val rules = currentRules.filterNot { it.id() == CORS_RULE_ID } + modelReadRule
         client.putBucketCors {
-            it.bucket(properties.bucket).corsConfiguration(CORSConfiguration.builder().corsRules(rules).build())
+            it.bucket(properties.bucket)
+                .corsConfiguration(
+                    CORSConfiguration.builder()
+                        .corsRules(rules)
+                        .build(),
+                )
         }
-    }
-
-    private companion object {
-        const val POLICY_SID = "Pokemon3dPublicModelRead"
-        const val CORS_RULE_ID = "Pokemon3dPublicModelCors"
     }
 }

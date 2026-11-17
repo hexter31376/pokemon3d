@@ -17,13 +17,33 @@ object S3ClientFactory {
         return S3Client.builder()
             .endpointOverride(URI(properties.endpoint))
             .region(Region.of(properties.region))
-            .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(properties.accessKey, properties.secretKey)))
-            .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(properties.pathStyle).build())
+            .credentialsProvider(
+                StaticCredentialsProvider.create(
+                    AwsBasicCredentials.create(properties.accessKey, properties.secretKey),
+                ),
+            )
+            .serviceConfiguration(
+                S3Configuration.builder()
+                    .pathStyleAccessEnabled(properties.pathStyle)
+                    .build(),
+            )
             .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
             .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
-            .httpClientBuilder(UrlConnectionHttpClient.builder().connectionTimeout(properties.connectTimeout).socketTimeout(properties.attemptTimeout))
-            .overrideConfiguration { it.apiCallAttemptTimeout(properties.attemptTimeout).apiCallTimeout(properties.requestTimeout)
-                .retryStrategy(StandardRetryStrategy.builder().maxAttempts(3).build()) }
+            .httpClientBuilder(
+                UrlConnectionHttpClient.builder()
+                    .connectionTimeout(properties.connectTimeout)
+                    .socketTimeout(properties.attemptTimeout),
+            )
+            .overrideConfiguration { configuration ->
+                configuration
+                    .apiCallAttemptTimeout(properties.attemptTimeout)
+                    .apiCallTimeout(properties.requestTimeout)
+                    .retryStrategy(
+                        StandardRetryStrategy.builder()
+                            .maxAttempts(3)
+                            .build(),
+                    )
+            }
             .build()
     }
 }

@@ -13,8 +13,14 @@ internal fun createDataset(root: Path): Pair<Path, ModelManifest> {
     val manifest = ManifestJson.read(Path.of(resource.toURI()))
     val json = """{"asset":{"version":"2.0"},"scenes":[{}],"scene":0}""".toByteArray()
     val padding = (4 - json.size % 4) % 4
-    val bytes = ByteBuffer.allocate(20 + json.size + padding).order(ByteOrder.LITTLE_ENDIAN)
-    bytes.putInt(0x46546c67).putInt(2).putInt(bytes.capacity()).putInt(json.size + padding).putInt(0x4e4f534a).put(json)
+    val bytes = ByteBuffer.allocate(20 + json.size + padding)
+        .order(ByteOrder.LITTLE_ENDIAN)
+    bytes.putInt(0x46546c67)
+        .putInt(2)
+        .putInt(bytes.capacity())
+        .putInt(json.size + padding)
+        .putInt(0x4e4f534a)
+        .put(json)
     repeat(padding) { bytes.put(32) }
     val file = root.resolve("models/fixture_001.glb")
     Files.createDirectories(file.parent); Files.write(file, bytes.array())

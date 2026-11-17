@@ -6,7 +6,6 @@ enum class StorageFailure {
     UNAVAILABLE,
     BUCKET_NOT_FOUND,
     INTEGRITY_MISMATCH,
-    CONFLICT,
     CONFIGURATION_MISMATCH,
 }
 

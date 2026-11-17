@@ -3,6 +3,8 @@ package com.pokemon3d.api.model3d.presentation
 import com.pokemon3d.api.global.dto.ApiError
 import com.pokemon3d.api.global.dto.ApiResponse
 import com.pokemon3d.api.global.dto.ErrorCode
+import com.pokemon3d.api.model3d.application.ModelAssetNotFoundException
+import com.pokemon3d.api.model3d.application.ModelNotFoundException
 import com.pokemon3d.api.model3d.application.ModelResourceNotFoundException
 import com.pokemon3d.api.model3d.domain.exception.ModelStorageException
 import com.pokemon3d.api.model3d.domain.exception.StorageFailure
@@ -17,9 +19,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 class ModelResourceExceptionHandler {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @ExceptionHandler(ModelResourceNotFoundException::class)
+    @ExceptionHandler(ModelNotFoundException::class, ModelAssetNotFoundException::class)
     fun notFound(ex: ModelResourceNotFoundException): ResponseEntity<ApiResponse<Nothing>> =
-        response(if (ex.missingAsset) ErrorCode.MODEL_ASSET_NOT_FOUND else ErrorCode.MODEL_NOT_FOUND)
+        response(
+            when (ex) {
+                is ModelAssetNotFoundException -> ErrorCode.MODEL_ASSET_NOT_FOUND
+                is ModelNotFoundException -> ErrorCode.MODEL_NOT_FOUND
+            },
+        )
 
     @ExceptionHandler(ModelStorageException::class)
     fun storageFailure(ex: ModelStorageException): ResponseEntity<ApiResponse<Nothing>> {
@@ -32,5 +39,7 @@ class ModelResourceExceptionHandler {
         })
     }
 
-    private fun response(code: ErrorCode) = ResponseEntity.status(code.status).body(ApiResponse.failure(ApiError.from(code)))
+    private fun response(code: ErrorCode) =
+        ResponseEntity.status(code.status)
+            .body(ApiResponse.failure(ApiError.from(code)))
 }

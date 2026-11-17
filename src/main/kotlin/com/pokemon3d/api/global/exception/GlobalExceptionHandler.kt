@@ -87,7 +87,9 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
             pathVariable?.name, pathVariable?.value,
             requestHeader?.name, requestHeader?.value,
             parameter.parameterName,
-        ).firstOrNull { it.isNotBlank() } ?: "arg${parameter.parameterIndex}"
+        )
+            .firstOrNull { it.isNotBlank() }
+            ?: "arg${parameter.parameterIndex}"
     }
 
     private fun resolveErrorCode(statusCode: HttpStatusCode): ErrorCode = when (statusCode.value()) {
