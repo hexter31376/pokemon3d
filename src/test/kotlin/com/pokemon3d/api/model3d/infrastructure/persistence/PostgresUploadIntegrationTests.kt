@@ -19,14 +19,17 @@ import kotlin.test.*
 @SpringBootTest(properties = ["pokemon.uploads.enabled=false", "pokemon.storage.s3.enabled=false"])
 class PostgresUploadIntegrationTests : ModelUploadDatabaseTests() {
     companion object {
-        private val schema = "test_" + UUID.randomUUID().toString().replace("-", "")
+        private val schema = "test_" + UUID.randomUUID()
+            .toString()
+            .replace("-", "")
         private val url = requireNotNull(System.getenv("MODEL_DATABASE_URL")) { "Set MODEL_DATABASE_URL" }
         private val user = requireNotNull(System.getenv("MODEL_DATABASE_USERNAME"))
         private val password = requireNotNull(System.getenv("MODEL_DATABASE_PASSWORD"))
         @JvmStatic @DynamicPropertySource
         fun database(registry: DynamicPropertyRegistry) {
             DriverManager.getConnection(url, user, password).use { connection ->
-                connection.createStatement().use { it.execute("CREATE SCHEMA $schema") }
+                connection.createStatement()
+                    .use { statement -> statement.execute("CREATE SCHEMA $schema") }
             }
             registry.add("spring.datasource.url") { url + (if ('?' in url) "&" else "?") + "currentSchema=$schema" }
             registry.add("spring.datasource.username") { user }
@@ -35,7 +38,8 @@ class PostgresUploadIntegrationTests : ModelUploadDatabaseTests() {
         }
         @JvmStatic @AfterAll fun removeSchema() {
             DriverManager.getConnection(url, user, password).use { connection ->
-                connection.createStatement().use { it.execute("DROP SCHEMA $schema CASCADE") }
+                connection.createStatement()
+                    .use { statement -> statement.execute("DROP SCHEMA $schema CASCADE") }
             }
         }
     }
@@ -58,15 +62,22 @@ class PostgresUploadIntegrationTests : ModelUploadDatabaseTests() {
                 assertTrue(models.findAll().isEmpty())
                 jobs.activate(id)
                 val model = models.findAll().single()
-                key = ObjectKeyResolver(props.prefix).resolve(model.asset.path)
+                key = ObjectKeyResolver(props.prefix)
+                    .resolve(model.asset.path)
                 val store = S3ObjectStore(client, props.bucket)
                 assertEquals(ContentDigest(model.asset.sizeBytes, model.asset.sha256), store.contentDigest(key))
                 // A retry after the DB commit is lost can verify the already uploaded object without local data.
                 publisher.publish(model, root.resolve("no-longer-present.glb"), location)
                 // Conditional PUT is enforced by this real S3-compatible server.
                 val collision = assertFailsWith<software.amazon.awssdk.services.s3.model.S3Exception> {
-                    client.putObject({ it.bucket(props.bucket).key(key).ifNoneMatch("*") },
-                        software.amazon.awssdk.core.sync.RequestBody.fromString("must not replace"))
+                    client.putObject(
+                        {
+                            it.bucket(props.bucket)
+                                .key(key)
+                                .ifNoneMatch("*")
+                        },
+                        software.amazon.awssdk.core.sync.RequestBody.fromString("must not replace"),
+                    )
                 }
                 assertEquals(412, collision.statusCode())
                 assertEquals(model.asset.sha256, store.contentDigest(key).sha256)

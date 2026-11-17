@@ -1,40 +1,81 @@
 package com.pokemon3d.api.model3d.infrastructure.persistence
 
-import com.pokemon3d.api.model3d.domain.*
+import com.pokemon3d.api.model3d.domain.ModelMetadata
+import com.pokemon3d.api.model3d.domain.ModelMetadataRepository
+import com.pokemon3d.api.model3d.domain.ModelStorageLocation
+import com.pokemon3d.api.model3d.domain.VersionedModel
 import jakarta.persistence.EntityManager
-import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
-import java.util.UUID
 
 @Repository
 @Transactional(readOnly = true)
-class JpaModelMetadataRepository(private val em: EntityManager, private val jdbc: JdbcTemplate) : ModelMetadataRepository {
-    override val datasetVersion: String
-        get() = jdbc.query("SELECT r.dataset_version FROM model_active_release a JOIN model_release r ON r.id=a.release_id WHERE a.singleton=1",
-            { rs, _ -> rs.getString(1) }).singleOrNull().orEmpty()
-
-    override fun findVersionedById(modelId: String): VersionedModel? = jdbc.query(
-        """SELECT r.dataset_version,m.metadata_json,r.storage_bucket,r.storage_prefix FROM model_active_release a
-            JOIN model_release r ON r.id=a.release_id JOIN model_metadata m ON m.release_id=r.id
-            WHERE a.singleton=1 AND m.model_id=?""",
-        { rs, _ -> VersionedModel(
-            rs.getString(1),
-            MetadataCodec.decode(rs.getString(2)),
-            ModelStorageLocation(requireNotNull(rs.getString(3)), requireNotNull(rs.getString(4))),
-        ) }, modelId).singleOrNull()
-
-    override fun findById(modelId: String) = findVersionedById(modelId)?.model
-    override fun findAll(): List<ModelMetadata> = query(null)
-    override fun findByPokedexNumber(pokedexNumber: Int): List<ModelMetadata> = query(pokedexNumber)
-
-    private fun query(number: Int?): List<ModelMetadata> {
-        val active = jdbc.query("SELECT release_id FROM model_active_release WHERE singleton=1", { rs, _ -> rs.getObject(1, UUID::class.java) }).singleOrNull() ?: return emptyList()
-        // Releases are immutable; switching the active pointer cannot alter this result set.
-        val query = em.createQuery("select m from ModelMetadataEntity m where m.releaseId=:release" +
-            (if (number == null) "" else " and m.pokedexNumber=:number") + " order by m.modelId", ModelMetadataEntity::class.java)
-            .setParameter("release", active)
-        if (number != null) query.setParameter("number", number)
-        return query.resultList.map { MetadataCodec.decode(it.metadataJson) }
+class JpaModelMetadataRepository(private val entityManager: EntityManager) : ModelMetadataRepository {
+    private companion object {
+        const val ACTIVE_RELEASE_ID = 1
     }
+
+    override val datasetVersion: String
+        get() = entityManager.createQuery(
+            """select release.datasetVersion from ModelActiveReleaseEntity active
+                join active.release release where active.singleton = :activeReleaseId""",
+            String::class.java,
+        )
+            .setParameter("activeReleaseId", ACTIVE_RELEASE_ID)
+            .resultList
+            .singleOrNull()
+            .orEmpty()
+
+    override fun findVersionedById(modelId: String): VersionedModel? =
+        entityManager.createQuery(
+            """select new com.pokemon3d.api.model3d.infrastructure.persistence.VersionedMetadataProjection(
+                    release.datasetVersion, metadata.metadataJson, release.storageBucket, release.storagePrefix)
+                from ModelActiveReleaseEntity active
+                join active.release release
+                join release.metadata metadata
+                where active.singleton = :activeReleaseId and metadata.modelId = :modelId""",
+            VersionedMetadataProjection::class.java,
+        )
+            .setParameter("activeReleaseId", ACTIVE_RELEASE_ID)
+            .setParameter("modelId", modelId)
+            .resultList
+            .singleOrNull()
+            ?.toVersionedModel()
+
+    override fun findById(modelId: String): ModelMetadata? = findVersionedById(modelId)?.model
+
+    override fun findAll(): List<ModelMetadata> = findMetadata()
+
+    override fun findByPokedexNumber(pokedexNumber: Int): List<ModelMetadata> =
+        findMetadata(pokedexNumber)
+
+    private fun findMetadata(pokedexNumber: Int? = null): List<ModelMetadata> = entityManager.createQuery(
+        """select metadata from ModelActiveReleaseEntity active
+            join active.release release
+            join release.metadata metadata
+            where active.singleton = :activeReleaseId
+                and (:pokedexNumber is null or metadata.pokedexNumber = :pokedexNumber)
+            order by metadata.modelId""",
+        ModelMetadataEntity::class.java,
+    )
+        .setParameter("activeReleaseId", ACTIVE_RELEASE_ID)
+        .setParameter("pokedexNumber", pokedexNumber)
+        .resultList
+        .map { MetadataCodec.decode(it.metadataJson) }
+
+    private fun VersionedMetadataProjection.toVersionedModel() = VersionedModel(
+        datasetVersion,
+        MetadataCodec.decode(metadataJson),
+        ModelStorageLocation(
+            requireNotNull(storageBucket) { "Active model release has no storage bucket" },
+            requireNotNull(storagePrefix) { "Active model release has no storage prefix" },
+        ),
+    )
 }
+
+internal data class VersionedMetadataProjection(
+    val datasetVersion: String,
+    val metadataJson: String,
+    val storageBucket: String?,
+    val storagePrefix: String?,
+)

@@ -10,15 +10,22 @@ import java.util.UUID
 @Entity
 @Table(name = "model_metadata")
 class ModelMetadataEntity(
-    @Id val id: UUID,
-    @Column(name = "release_id", nullable = false) val releaseId: UUID,
-    @Column(name = "model_id", nullable = false, length = 200) val modelId: String,
-    @Column(name = "pokedex_number", nullable = false) val pokedexNumber: Int,
-    @Column(name = "metadata_json", nullable = false, columnDefinition = "text") val metadataJson: String,
+    @Id var id: UUID,
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "release_id", nullable = false)
+    var release: ModelReleaseEntity,
+    @Column(name = "model_id", nullable = false, length = 200) var modelId: String,
+    @Column(name = "pokedex_number", nullable = false) var pokedexNumber: Int,
+    @Column(name = "metadata_json", nullable = false, columnDefinition = "text") var metadataJson: String,
 )
 
 internal object MetadataCodec {
-    private val mapper = JsonMapper.builder().addModule(KotlinModule.Builder().build()).build()
+    private val mapper = JsonMapper.builder()
+        .addModule(
+            KotlinModule.Builder()
+                .build(),
+        )
+        .build()
     fun encode(model: ModelMetadata): String = mapper.writeValueAsString(model)
     fun decode(json: String): ModelMetadata = mapper.readValue(json, ModelMetadata::class.java)
 }

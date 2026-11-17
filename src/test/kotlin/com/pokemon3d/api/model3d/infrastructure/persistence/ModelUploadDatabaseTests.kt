@@ -4,7 +4,10 @@ import com.pokemon3d.api.model3d.application.ModelUploadWorker
 import com.pokemon3d.api.model3d.domain.*
 import com.pokemon3d.api.model3d.infrastructure.importer.ManifestDatabaseImporter
 import com.pokemon3d.api.model3d.infrastructure.manifest.tools.ManifestWriter
+import com.pokemon3d.api.model3d.infrastructure.storage.s3.LegacyStorageLocationBackfill
+import com.pokemon3d.api.model3d.infrastructure.storage.s3.S3StorageProperties
 import com.pokemon3d.api.model3d.infrastructure.storage.s3.createDataset
+import jakarta.persistence.EntityManager
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -30,6 +33,7 @@ open class ModelUploadDatabaseTests {
     @Autowired lateinit var jobs: ModelUploadRepository
     @Autowired lateinit var models: ModelMetadataRepository
     @Autowired lateinit var jdbc: JdbcTemplate
+    @Autowired lateinit var entityManager: EntityManager
     @Autowired lateinit var transactionManager: PlatformTransactionManager
     @TempDir lateinit var root: Path
     private val lease = Duration.ofMinutes(10)
@@ -67,6 +71,34 @@ open class ModelUploadDatabaseTests {
         jobs.activate(id) // idempotent activation
     }
 
+    @Test fun `legacy storage location backfill fills only missing entity properties`() {
+        val releaseId = submit("legacy")
+        jdbc.update(
+            "UPDATE model_release SET storage_bucket=?, storage_prefix=NULL WHERE id=?",
+            "existing-bucket",
+            releaseId,
+        )
+        val backfill = LegacyStorageLocationBackfill(
+            entityManager,
+            S3StorageProperties(bucket = "configured-bucket", prefix = "configured-prefix"),
+        )
+
+        TransactionTemplate(transactionManager).executeWithoutResult {
+            backfill.afterSingletonsInstantiated()
+        }
+
+        assertEquals("existing-bucket", jdbc.queryForObject(
+            "SELECT storage_bucket FROM model_release WHERE id=?",
+            String::class.java,
+            releaseId,
+        ))
+        assertEquals("configured-prefix", jdbc.queryForObject(
+            "SELECT storage_prefix FROM model_release WHERE id=?",
+            String::class.java,
+            releaseId,
+        ))
+    }
+
     @Test fun `identical request is idempotent and changed request is rejected`() {
         val id = submit("v1", "request")
         assertEquals(id, submit("v1", "request"))
@@ -90,7 +122,8 @@ open class ModelUploadDatabaseTests {
     @Test fun `two workers cannot claim the same job`() {
         submit()
         Executors.newFixedThreadPool(2).use { executor ->
-            val claims = executor.invokeAll(List(2) { Callable { jobs.claim(lease, 3) } }).map { it.get() }
+            val claims = executor.invokeAll(List(2) { Callable { jobs.claim(lease, 3) } })
+                .map { it.get() }
             assertEquals(1, claims.count { it != null })
         }
     }
@@ -162,7 +195,8 @@ open class ModelUploadDatabaseTests {
         Executors.newFixedThreadPool(2).use { executor ->
             val ids = executor.invokeAll(List(2) { Callable {
                 ManifestDatabaseImporter(jobs, root.resolve("spool"), storageLocation).submit(root, path, "same-request")
-            } }).map { it.get() }
+            } })
+                .map { it.get() }
             assertEquals(ids[0], ids[1])
         }
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM model_release", Int::class.java))
