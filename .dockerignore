@@ -9,3 +9,6 @@ runtime-data/
 **/manifest.json
 **/manifest-*.json
 src/test/
+.env
+.env.*
+!.env.example

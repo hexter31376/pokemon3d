@@ -47,3 +47,8 @@ out/
 /manifest-*.json
 /data/
 /runtime-data/
+
+### Local credentials ###
+.env
+.env.*
+!.env.example

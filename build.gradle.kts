@@ -21,6 +21,7 @@ repositories {
 }
 
 dependencies {
+    developmentOnly("org.springframework.boot:spring-boot-docker-compose")
     implementation(platform("software.amazon.awssdk:bom:2.59.2"))
     implementation("software.amazon.awssdk:s3")
     implementation("software.amazon.awssdk:url-connection-client")
@@ -74,6 +75,20 @@ tasks.register<JavaExec>("verifyModelManifest") {
 
 springBoot {
     mainClass.set("com.pokemon3d.api.Pokemon3dApplicationKt")
+}
+
+// Container tests are opt-in; default tests require neither Docker nor production assets.
+tasks.test {
+    useJUnitPlatform { excludeTags("storageIntegration") }
+}
+
+tasks.register<Test>("storageIntegrationTest") {
+    group = "verification"
+    description = "Tests S3 storage against SeaweedFS 4.53 (requires Docker)."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform { includeTags("storageIntegration") }
+    shouldRunAfter(tasks.test)
 }
 
 tasks.register<JavaExec>("modelStorage") {

@@ -1,0 +1,15 @@
+services:
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.53
+    command: [mini, '-dir=/data', '-admin.ui=false', '-webdav=false', '-master.telemetry=false']
+    ports:
+      - '127.0.0.1:${MODEL_STORAGE_PORT:-8333}:8333'
+    environment:
+      AWS_ACCESS_KEY_ID: ${MODEL_STORAGE_ACCESS_KEY:?Set MODEL_STORAGE_ACCESS_KEY in .env}
+      AWS_SECRET_ACCESS_KEY: ${MODEL_STORAGE_SECRET_KEY:?Set MODEL_STORAGE_SECRET_KEY in .env}
+      S3_BUCKET: ${MODEL_STORAGE_BUCKET:-pokemon-assets}
+    volumes:
+      - seaweedfs-data:/data
+
+volumes:
+  seaweedfs-data:
