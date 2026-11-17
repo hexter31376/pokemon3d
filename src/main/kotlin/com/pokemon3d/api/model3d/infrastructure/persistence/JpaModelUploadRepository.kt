@@ -42,6 +42,8 @@ class JpaModelUploadRepository(private val jdbc: JdbcTemplate, private val em: E
         require(!lease.isNegative && !lease.isZero && maxAttempts > 0)
         jdbc.update("""UPDATE model_upload_job SET state='FAILED',lease_token=NULL,lease_until=NULL,last_error='LEASE_EXHAUSTED'
             WHERE state='RUNNING' AND lease_until<CURRENT_TIMESTAMP AND attempts>=?""", maxAttempts)
+        jdbc.update("""UPDATE model_upload_job SET state='FAILED',last_error='RETRY_LIMIT_REACHED'
+            WHERE state='PENDING' AND attempts>=?""", maxAttempts)
         jdbc.update("""UPDATE model_release SET state='FAILED' WHERE state='UPLOADING'
             AND EXISTS (SELECT 1 FROM model_upload_job j WHERE j.release_id=model_release.id AND j.state='FAILED')""")
         val job = jdbc.query("""SELECT j.*,
