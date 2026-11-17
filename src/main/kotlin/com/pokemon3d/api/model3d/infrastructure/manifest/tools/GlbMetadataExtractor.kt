@@ -1,6 +1,11 @@
 package com.pokemon3d.api.model3d.infrastructure.manifest.tools
 
-import com.pokemon3d.api.model3d.domain.*
+import com.pokemon3d.api.model3d.domain.ModelAsset
+import com.pokemon3d.api.model3d.domain.ModelBounds
+import com.pokemon3d.api.model3d.domain.ModelCamera
+import com.pokemon3d.api.model3d.domain.ModelForm
+import com.pokemon3d.api.model3d.domain.ModelMetadata
+import com.pokemon3d.api.model3d.domain.ModelMotion
 import com.pokemon3d.api.model3d.infrastructure.manifest.ManifestJson
 import com.pokemon3d.api.model3d.infrastructure.manifest.ManifestValidator
 import com.pokemon3d.api.model3d.infrastructure.manifest.ModelManifest
@@ -84,14 +89,24 @@ internal class GlbMetadataExtractor {
         }
         val id = e.required("id").text("id")
         val formCode = e.required("formCode").takeUnless { it.isNull || it.asString().isEmpty() }?.text("formCode") ?: id.removeSuffix("_rare")
-        return ModelMetadata(id, number, e.required("ko").text("ko"), e.required("en").text("en"),
+        return ModelMetadata(
+            id, number, e.required("ko").text("ko"), e.required("en").text("en"),
             ModelForm(formCode, e.required("formKind").text("formKind"), e.required("formLabel").text("formLabel")),
             category == "shiny", e.required("gender").text("gender"), generationNumber,
-            ModelAsset(relative, Files.size(path), digest.digest().joinToString("") { "%02x".format(it) },
-                (gltf.get("extensionsRequired")?.array("extensionsRequired") ?: emptyList()).map { it.text("extension") }.sorted()),
-            motions, ModelCamera(name, c.required("direction").vector("direction"), fov,
+            ModelAsset(
+                relative, Files.size(path), digest.digest().joinToString("") { "%02x".format(it) },
+                (gltf.get("extensionsRequired")?.array("extensionsRequired")
+                    ?: emptyList()).map { it.text("extension") }.sorted()
+            ),
+            motions, ModelCamera(
+                name, c.required("direction").vector("direction"), fov,
                 c.required("padding").number("padding"), c.required("target").vector("target"),
-                ModelBounds(c.required("bounds").required("min").vector("bounds.min"), c.required("bounds").required("max").vector("bounds.max"))))
+                ModelBounds(
+                    c.required("bounds").required("min").vector("bounds.min"),
+                    c.required("bounds").required("max").vector("bounds.max")
+                )
+            )
+        )
     }
 
     internal fun readGlb(path: Path): JsonNode = RandomAccessFile(path.toFile(), "r").use { file ->

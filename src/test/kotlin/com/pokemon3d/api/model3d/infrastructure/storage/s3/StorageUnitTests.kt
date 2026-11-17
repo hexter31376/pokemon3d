@@ -6,6 +6,9 @@ import com.pokemon3d.api.model3d.domain.*
 import com.pokemon3d.api.model3d.infrastructure.manifest.JsonManifestModelMetadataRepository
 import com.pokemon3d.api.model3d.presentation.ModelResourceExceptionHandler
 import com.pokemon3d.api.global.exception.GlobalExceptionHandler
+import com.pokemon3d.api.model3d.domain.ModelAsset
+import com.pokemon3d.api.model3d.domain.exception.ModelStorageException
+import com.pokemon3d.api.model3d.domain.exception.StorageFailure
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.*
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
@@ -19,7 +22,6 @@ import software.amazon.awssdk.services.s3.model.*
 import software.amazon.awssdk.core.exception.SdkClientException
 import java.net.URI
 import java.nio.file.Path
-import java.time.Duration
 import java.util.UUID
 import kotlin.test.*
 
@@ -35,7 +37,14 @@ class StorageUnitTests {
         assertEquals("https://assets.example.test/bucket/pokemon/models/%ED%94%BC%EC%B9%B4%20%EC%B8%84%23%3F.glb", result.toString())
         val client = mock(S3Client::class.java)
         val storage = S3ModelAssetStorage(client, properties())
-        assertEquals("assets.example.test", storage.publicUrl(ModelAsset("models/a.glb", 1, "a".repeat(64), emptyList())).host)
+        assertEquals("assets.example.test", storage.publicUrl(
+            ModelAsset(
+                "models/a.glb",
+                1,
+                "a".repeat(64),
+                emptyList()
+            )
+        ).host)
         verifyNoInteractions(client)
     }
 
@@ -109,7 +118,11 @@ class StorageUnitTests {
     @RestController
     class FailureController {
         @GetMapping("/storage-failure")
-        fun failure(): Unit = throw ModelStorageException(StorageFailure.ACCESS_DENIED, "private/key", IllegalStateException("private error details"))
+        fun failure(): Unit = throw ModelStorageException(
+            StorageFailure.ACCESS_DENIED,
+            "private/key",
+            IllegalStateException("private error details")
+        )
         @GetMapping("/asset-missing")
         fun missing(): Unit = throw ModelResourceNotFoundException("missing", true)
     }

@@ -4,8 +4,8 @@ import com.pokemon3d.api.global.dto.ApiError
 import com.pokemon3d.api.global.dto.ApiResponse
 import com.pokemon3d.api.global.dto.ErrorCode
 import com.pokemon3d.api.model3d.application.ModelResourceNotFoundException
-import com.pokemon3d.api.model3d.domain.ModelStorageException
-import com.pokemon3d.api.model3d.domain.StorageFailure
+import com.pokemon3d.api.model3d.domain.exception.ModelStorageException
+import com.pokemon3d.api.model3d.domain.exception.StorageFailure
 import org.slf4j.LoggerFactory
 import org.springframework.core.annotation.Order
 import org.springframework.http.ResponseEntity

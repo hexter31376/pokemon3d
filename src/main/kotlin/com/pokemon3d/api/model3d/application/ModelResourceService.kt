@@ -1,6 +1,9 @@
 package com.pokemon3d.api.model3d.application
 
 import com.pokemon3d.api.model3d.domain.*
+import com.pokemon3d.api.model3d.domain.ModelMetadata
+import com.pokemon3d.api.model3d.domain.exception.ModelStorageException
+import com.pokemon3d.api.model3d.domain.exception.StorageFailure
 import java.net.URI
 
 /** Application use case; orchestration only, independent of Spring and storage SDKs. */

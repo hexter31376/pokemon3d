@@ -1,7 +1,7 @@
 package com.pokemon3d.api.model3d.infrastructure.storage.s3
 
-import com.pokemon3d.api.model3d.domain.ModelStorageException
-import com.pokemon3d.api.model3d.domain.StorageFailure
+import com.pokemon3d.api.model3d.domain.exception.ModelStorageException
+import com.pokemon3d.api.model3d.domain.exception.StorageFailure
 import com.pokemon3d.api.model3d.domain.StoredModelAsset
 import software.amazon.awssdk.core.exception.SdkException
 import software.amazon.awssdk.core.sync.RequestBody

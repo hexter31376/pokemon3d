@@ -1,6 +1,8 @@
 package com.pokemon3d.api.model3d.infrastructure.storage.s3
 
 import com.pokemon3d.api.model3d.domain.*
+import com.pokemon3d.api.model3d.domain.exception.ModelStorageException
+import com.pokemon3d.api.model3d.domain.exception.StorageFailure
 import com.pokemon3d.api.model3d.infrastructure.manifest.ManifestJson
 import com.pokemon3d.api.model3d.infrastructure.manifest.ModelManifest
 import com.pokemon3d.api.model3d.infrastructure.manifest.tools.ManifestWriter

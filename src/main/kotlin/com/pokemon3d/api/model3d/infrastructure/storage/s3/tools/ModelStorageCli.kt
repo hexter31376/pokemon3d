@@ -1,6 +1,6 @@
 package com.pokemon3d.api.model3d.infrastructure.storage.s3.tools
 
-import com.pokemon3d.api.model3d.domain.ModelStorageException
+import com.pokemon3d.api.model3d.domain.exception.ModelStorageException
 import com.pokemon3d.api.model3d.infrastructure.storage.s3.*
 import java.nio.file.Path
 import kotlin.system.exitProcess
