@@ -54,14 +54,11 @@ tasks.processResources {
     exclude("**/*.glb", "**/manifest.json", "**/manifest-*.json")
 }
 
-val testManifestTools = tasks.register<Exec>("testManifestTools") {
+tasks.register<JavaExec>("modelManifest") {
     group = "verification"
-    description = "Tests the metadata extractor using tiny generated GLBs (requires Python 3.10+)."
-    commandLine("python3", "-m", "unittest", "discover", "-s", "tools/tests", "-v")
-}
-
-tasks.test {
-    dependsOn(testManifestTools)
+    description = "Extracts or verifies GLB metadata (--args='extract|verify --data-root ...')."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.pokemon3d.api.model3d.infrastructure.manifest.tools.ModelManifestCliKt")
 }
 
 tasks.register<JavaExec>("verifyModelManifest") {

@@ -47,4 +47,3 @@ out/
 /manifest-*.json
 /data/
 /runtime-data/
-__pycache__/

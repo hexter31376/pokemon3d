@@ -9,4 +9,3 @@ runtime-data/
 **/manifest.json
 **/manifest-*.json
 src/test/
-tools/tests/
