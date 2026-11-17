@@ -19,9 +19,9 @@ class ModelUploadConfiguration {
     fun modelUploadWorker(
         jobs: ModelUploadRepository,
         publisher: ModelAssetPublisher,
-        @Value("\${pokemon.uploads.lease-seconds:600}") lease: Long,
-        @Value("\${pokemon.uploads.max-attempts:3}") attempts: Int,
-        @Value("\${pokemon.uploads.retry-delay-seconds:30}") retry: Long,
+        @Value($$"${pokemon.uploads.lease-seconds:600}") lease: Long,
+        @Value($$"${pokemon.uploads.max-attempts:3}") attempts: Int,
+        @Value($$"${pokemon.uploads.retry-delay-seconds:30}") retry: Long,
     ): ModelUploadWorker {
         require(isValidRetryConfiguration(lease, attempts, retry))
         return ModelUploadWorker(
@@ -36,7 +36,7 @@ class ModelUploadConfiguration {
     @Bean
     fun uploadPoller(
         worker: ModelUploadWorker,
-        @Value("\${pokemon.uploads.batch-size:16}") batchSize: Int,
+        @Value($$"${pokemon.uploads.batch-size:16}") batchSize: Int,
     ): UploadPoller {
         require(batchSize in 1..1000)
         return UploadPoller(worker, batchSize)
@@ -48,7 +48,7 @@ class ModelUploadConfiguration {
 
 class UploadPoller(private val worker: ModelUploadWorker, private val batchSize: Int) {
     private val log = LoggerFactory.getLogger(javaClass)
-    @Scheduled(fixedDelayString = "\${pokemon.uploads.poll-delay-ms:1000}")
+    @Scheduled(fixedDelayString = $$"${pokemon.uploads.poll-delay-ms:1000}")
     fun poll() {
         try { repeat(batchSize) { if (!worker.runOnce()) return } }
         catch (ex: Exception) { log.error("Upload worker polling failed: {}", ex.javaClass.simpleName) }

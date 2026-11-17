@@ -3,6 +3,7 @@ package com.pokemon3d.api.model3d.infrastructure.persistence
 import com.pokemon3d.api.model3d.domain.*
 import jakarta.persistence.EntityManager
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.core.queryForObject
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
 import java.nio.file.Path
@@ -32,9 +33,8 @@ class JpaModelUploadRepository(
         require(hasUniqueModelIds(models))
         // Serialize registration and activation so base_revision and idempotency are consistent.
         val revision = requireNotNull(
-            jdbc.queryForObject(
+            jdbc.queryForObject<Long>(
                 "SELECT revision FROM model_active_release WHERE singleton=1 FOR UPDATE",
-                Long::class.java,
             ),
         ) { "Active release revision is missing" }
         findRequest(requestKey, fingerprint)?.let { return it }
@@ -181,9 +181,8 @@ class JpaModelUploadRepository(
 
     override fun complete(job: UploadJob): Boolean {
         if (!owns(job)) return false
-        jdbc.queryForObject(
+        jdbc.queryForObject<String>(
             "SELECT state FROM model_release WHERE id = ? FOR UPDATE",
-            String::class.java,
             job.releaseId,
         )
         val release = em.getReference(ModelReleaseEntity::class.java, job.releaseId)
@@ -223,9 +222,8 @@ class JpaModelUploadRepository(
     override fun fail(job: UploadJob, reason: String, maxAttempts: Int, retryDelay: Duration) {
         if (!owns(job)) return
         val attempts = requireNotNull(
-            jdbc.queryForObject(
+            jdbc.queryForObject<Int>(
                 "SELECT attempts FROM model_upload_job WHERE id = ?",
-                Int::class.java,
                 job.id,
             ),
         ) { "Upload job ${job.id} no longer exists" }
@@ -263,9 +261,8 @@ class JpaModelUploadRepository(
             .singleOrNull() == true
 
     private fun databaseNow(): Instant = requireNotNull(
-        jdbc.queryForObject(
+        jdbc.queryForObject<java.time.OffsetDateTime>(
             "SELECT CURRENT_TIMESTAMP",
-            java.time.OffsetDateTime::class.java,
         ),
     ) { "Database did not return its current timestamp" }
         .toInstant()
@@ -309,8 +306,7 @@ class JpaModelUploadRepository(
     override fun activate(releaseId: UUID) {
         val active = jdbc.query(
             "SELECT release_id, revision FROM model_active_release WHERE singleton = 1 FOR UPDATE",
-            { rs, _ -> rs.getObject(1, UUID::class.java) to rs.getLong(2) },
-        )
+        ) { rs, _ -> rs.getObject(1, UUID::class.java) to rs.getLong(2) }
             .single()
         if (active.first == releaseId) return
         val release = jdbc.query(
@@ -324,9 +320,8 @@ class JpaModelUploadRepository(
         if (release.second != active.second) {
             throw UploadRejectedException("Active release changed since submission; import a new release")
         }
-        val metadataCount = jdbc.queryForObject(
+        val metadataCount = jdbc.queryForObject<Int>(
             "SELECT COUNT(*) FROM model_metadata WHERE release_id = ?",
-            Int::class.java,
             releaseId,
         )
         check(metadataCount == release.third)
