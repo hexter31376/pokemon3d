@@ -37,3 +37,13 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+### Local 3D resource data ###
+/datasorce/
+
+### External model manifests and resources ###
+*.glb
+/manifest.json
+/manifest-*.json
+/data/
+/runtime-data/

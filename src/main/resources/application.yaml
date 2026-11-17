@@ -1,3 +1,7 @@
 spring:
   application:
     name: pokemon3d
+
+pokemon:
+  models:
+    manifest-path: ${POKEMON_MODELS_MANIFEST_PATH:}

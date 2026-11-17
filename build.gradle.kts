@@ -23,6 +23,7 @@ repositories {
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("tools.jackson.module:jackson-module-kotlin")
     runtimeOnly("org.postgresql:postgresql")
@@ -46,4 +47,28 @@ allOpen {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+// Runtime model data is mounted externally, never packaged with the application.
+tasks.processResources {
+    exclude("**/*.glb", "**/manifest.json", "**/manifest-*.json")
+}
+
+tasks.register<JavaExec>("modelManifest") {
+    group = "verification"
+    description = "Extracts or verifies GLB metadata (--args='extract|verify --data-root ...')."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.pokemon3d.api.model3d.infrastructure.manifest.tools.ModelManifestCliKt")
+}
+
+tasks.register<JavaExec>("verifyModelManifest") {
+    group = "verification"
+    description = "Loads an external manifest with the production repository (-PmanifestPath=...)."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.pokemon3d.api.model3d.infrastructure.manifest.VerifyModelManifestKt")
+    args(providers.gradleProperty("manifestPath").getOrElse(""))
+}
+
+springBoot {
+    mainClass.set("com.pokemon3d.api.Pokemon3dApplicationKt")
 }
