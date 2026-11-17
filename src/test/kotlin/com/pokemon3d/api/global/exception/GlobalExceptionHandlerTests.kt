@@ -3,7 +3,10 @@ package com.pokemon3d.api.global.exception
 import com.pokemon3d.api.global.dto.ApiResponse
 import com.pokemon3d.api.global.dto.ErrorCode
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
+import org.springframework.web.method.annotation.HandlerMethodValidationException
+import kotlin.test.assertIs
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
@@ -97,8 +100,54 @@ class GlobalExceptionHandlerTests {
             .andExpect(jsonPath("$.error.code").value("COMMON_005"))
     }
 
+    @Test
+    fun `constrained request parameter includes public name and message`() {
+        mvc.perform(get("/test/constrained").param("pokemonId", "0"))
+            .andExpect(status().isBadRequest)
+            .andExpect { assertIs<HandlerMethodValidationException>(it.resolvedException) }
+            .andExpect(jsonPath("$.error.code").value("COMMON_001"))
+            .andExpect(jsonPath("$.error.fields[0].field").value("pokemonId"))
+            .andExpect(jsonPath("$.error.fields[0].message").value("ID는 1 이상이어야 합니다."))
+    }
+
+    @Test
+    fun `method validation preserves request body field details`() {
+        mvc.perform(post("/test/constrained-body").param("id", "1")
+            .contentType(MediaType.APPLICATION_JSON).content("""{"name":""}"""))
+            .andExpect(status().isBadRequest)
+            .andExpect { assertIs<HandlerMethodValidationException>(it.resolvedException) }
+            .andExpect(jsonPath("$.error.code").value("COMMON_001"))
+            .andExpect(jsonPath("$.error.fields[0].field").value("name"))
+            .andExpect(jsonPath("$.error.fields[0].message").value("이름은 필수입니다."))
+    }
+
+    @Test
+    fun `return value validation hides details`() {
+        mvc.perform(get("/test/invalid-return"))
+            .andExpect(status().isInternalServerError)
+            .andExpect { assertIs<HandlerMethodValidationException>(it.resolvedException) }
+            .andExpect(jsonPath("$.error.code").value("COMMON_010"))
+            .andExpect(jsonPath("$.error.message").value("내부 서버 오류가 발생했습니다."))
+            .andExpect(jsonPath("$.error.fields").isEmpty)
+    }
+
     @RestController
     class TestController {
+        @GetMapping("/test/constrained")
+        fun constrained(
+            @RequestParam("pokemonId") @Min(1, message = "ID는 1 이상이어야 합니다.") id: Long,
+        ) = ApiResponse.success(id)
+
+        @PostMapping("/test/constrained-body")
+        fun constrainedBody(
+            @RequestParam("id") @Min(1) id: Long,
+            @Valid @RequestBody body: TestRequest,
+        ) = ApiResponse.success(mapOf("id" to id, "name" to body.name))
+
+        @GetMapping("/test/invalid-return")
+        @Min(1, message = "internal return value validation detail")
+        fun invalidReturn(): Long = 0
+
         @GetMapping("/test/empty")
         fun empty() = ApiResponse.success()
 
