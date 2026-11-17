@@ -16,6 +16,18 @@ internal class ModelDatasetUploader(private val objects: DatasetObjectStore, pri
 
     fun execute(root: Path, manifestPath: Path, upload: Boolean, overwrite: Boolean = false): TransferReport {
         require(upload || !overwrite) { "--overwrite requires upload" }
+        val snapshot = Files.createTempFile("model-manifest-", ".json")
+        try {
+            Files.newInputStream(manifestPath).use { input ->
+                Files.newOutputStream(snapshot).use { output -> input.copyTo(output) }
+            }
+            return executeSnapshot(root, snapshot, upload, overwrite)
+        } finally {
+            Files.deleteIfExists(snapshot)
+        }
+    }
+
+    private fun executeSnapshot(root: Path, manifestPath: Path, upload: Boolean, overwrite: Boolean): TransferReport {
         val manifest = ManifestJson.read(manifestPath)
         val dataRoot = root.toRealPath()
         val listed = manifest.models.map { it.asset.path }.toSet()
