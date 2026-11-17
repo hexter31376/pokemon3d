@@ -48,3 +48,30 @@ allOpen {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
+
+// Runtime model data is mounted externally, never packaged with the application.
+tasks.processResources {
+    exclude("**/*.glb", "**/manifest.json", "**/manifest-*.json")
+}
+
+val testManifestTools = tasks.register<Exec>("testManifestTools") {
+    group = "verification"
+    description = "Tests the metadata extractor using tiny generated GLBs (requires Python 3.10+)."
+    commandLine("python3", "-m", "unittest", "discover", "-s", "tools/tests", "-v")
+}
+
+tasks.test {
+    dependsOn(testManifestTools)
+}
+
+tasks.register<JavaExec>("verifyModelManifest") {
+    group = "verification"
+    description = "Loads an external manifest with the production repository (-PmanifestPath=...)."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.pokemon3d.api.model3d.infrastructure.manifest.VerifyModelManifestKt")
+    args(providers.gradleProperty("manifestPath").getOrElse(""))
+}
+
+springBoot {
+    mainClass.set("com.pokemon3d.api.Pokemon3dApplicationKt")
+}
