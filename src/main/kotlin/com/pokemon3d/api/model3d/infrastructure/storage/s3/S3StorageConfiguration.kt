@@ -1,9 +1,7 @@
 package com.pokemon3d.api.model3d.infrastructure.storage.s3
 
-import com.pokemon3d.api.model3d.application.ModelResourceService
 import com.pokemon3d.api.model3d.domain.ModelAssetPublisher
 import com.pokemon3d.api.model3d.domain.ModelAssetStorage
-import com.pokemon3d.api.model3d.domain.ModelMetadataRepository
 import jakarta.persistence.EntityManager
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -19,15 +17,14 @@ class S3StorageConfiguration {
     fun modelS3Client(properties: S3StorageProperties): S3Client = S3ClientFactory.create(properties)
 
     @Bean
-    fun modelAssetStorage(client: S3Client, properties: S3StorageProperties): ModelAssetStorage = S3ModelAssetStorage(client, properties)
+    fun modelAssetStorage(client: S3Client, properties: S3StorageProperties): ModelAssetStorage =
+        S3ModelAssetStorage(client, properties)
 
     @Bean
-    fun modelAssetPublisher(client: S3Client, properties: S3StorageProperties): ModelAssetPublisher = S3ModelAssetPublisher(client, properties)
+    fun modelAssetPublisher(client: S3Client, properties: S3StorageProperties): ModelAssetPublisher =
+        S3ModelAssetPublisher(client, properties)
 
     @Bean
     fun legacyStorageLocationBackfill(entityManager: EntityManager, properties: S3StorageProperties) =
         LegacyStorageLocationBackfill(entityManager, properties)
-
-    @Bean
-    fun modelResourceService(metadata: ModelMetadataRepository, storage: ModelAssetStorage) = ModelResourceService(metadata, storage)
 }

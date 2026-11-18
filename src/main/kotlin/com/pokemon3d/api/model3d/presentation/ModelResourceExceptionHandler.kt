@@ -6,6 +6,7 @@ import com.pokemon3d.api.global.dto.ErrorCode
 import com.pokemon3d.api.model3d.application.ModelAssetNotFoundException
 import com.pokemon3d.api.model3d.application.ModelNotFoundException
 import com.pokemon3d.api.model3d.application.ModelResourceNotFoundException
+import com.pokemon3d.api.model3d.application.PokemonNotFoundException
 import com.pokemon3d.api.model3d.domain.exception.ModelStorageException
 import com.pokemon3d.api.model3d.domain.exception.StorageFailure
 import org.slf4j.LoggerFactory
@@ -19,12 +20,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 class ModelResourceExceptionHandler {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @ExceptionHandler(ModelNotFoundException::class, ModelAssetNotFoundException::class)
+    @ExceptionHandler(
+        ModelNotFoundException::class,
+        ModelAssetNotFoundException::class,
+        PokemonNotFoundException::class,
+    )
     fun notFound(ex: ModelResourceNotFoundException): ResponseEntity<ApiResponse<Nothing>> =
         response(
             when (ex) {
                 is ModelAssetNotFoundException -> ErrorCode.MODEL_ASSET_NOT_FOUND
                 is ModelNotFoundException -> ErrorCode.MODEL_NOT_FOUND
+                is PokemonNotFoundException -> ErrorCode.MODEL_NOT_FOUND
             },
         )
 

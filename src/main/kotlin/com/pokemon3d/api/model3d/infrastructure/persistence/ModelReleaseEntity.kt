@@ -31,6 +31,8 @@ class ModelActiveReleaseEntity(
     @Id
     @Column(name = "singleton")
     var singleton: Int,
+    @Column(name = "revision", nullable = false)
+    var revision: Long,
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "release_id")
     var release: ModelReleaseEntity?,

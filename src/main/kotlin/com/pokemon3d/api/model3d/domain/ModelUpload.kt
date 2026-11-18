@@ -38,6 +38,7 @@ data class VersionedModel(
     val datasetVersion: String,
     val model: ModelMetadata,
     val storageLocation: ModelStorageLocation = ModelStorageLocation("", ""),
+    val revision: Long = 0,
 )
 
 class UploadRejectedException(message: String) : RuntimeException(message)

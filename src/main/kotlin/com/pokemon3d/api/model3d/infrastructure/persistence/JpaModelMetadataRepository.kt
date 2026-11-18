@@ -29,7 +29,8 @@ class JpaModelMetadataRepository(private val entityManager: EntityManager) : Mod
     override fun findVersionedById(modelId: String): VersionedModel? =
         entityManager.createQuery(
             """select new com.pokemon3d.api.model3d.infrastructure.persistence.VersionedMetadataProjection(
-                    release.datasetVersion, metadata.metadataJson, release.storageBucket, release.storagePrefix)
+                    release.datasetVersion, metadata.metadataJson, release.storageBucket, release.storagePrefix,
+                    active.revision)
                 from ModelActiveReleaseEntity active
                 join active.release release
                 join release.metadata metadata
@@ -70,6 +71,7 @@ class JpaModelMetadataRepository(private val entityManager: EntityManager) : Mod
             requireNotNull(storageBucket) { "Active model release has no storage bucket" },
             requireNotNull(storagePrefix) { "Active model release has no storage prefix" },
         ),
+        revision,
     )
 }
 
@@ -78,4 +80,5 @@ internal data class VersionedMetadataProjection(
     val metadataJson: String,
     val storageBucket: String?,
     val storagePrefix: String?,
+    val revision: Long,
 )
