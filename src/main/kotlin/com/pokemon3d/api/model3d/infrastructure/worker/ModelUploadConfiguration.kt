@@ -1,14 +1,13 @@
 package com.pokemon3d.api.model3d.infrastructure.worker
 
 import com.pokemon3d.api.model3d.application.ModelUploadWorker
-import com.pokemon3d.api.model3d.domain.*
-import org.slf4j.LoggerFactory
+import com.pokemon3d.api.model3d.domain.ModelAssetPublisher
+import com.pokemon3d.api.model3d.domain.ModelUploadRepository
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.EnableScheduling
-import org.springframework.scheduling.annotation.Scheduled
 import java.time.Duration
 
 @Configuration(proxyBeanMethods = false)
@@ -44,13 +43,4 @@ class ModelUploadConfiguration {
 
     private fun isValidRetryConfiguration(leaseSeconds: Long, attempts: Int, retrySeconds: Long): Boolean =
         leaseSeconds > 0 && attempts > 0 && retrySeconds >= 0
-}
-
-class UploadPoller(private val worker: ModelUploadWorker, private val batchSize: Int) {
-    private val log = LoggerFactory.getLogger(javaClass)
-    @Scheduled(fixedDelayString = $$"${pokemon.uploads.poll-delay-ms:1000}")
-    fun poll() {
-        try { repeat(batchSize) { if (!worker.runOnce()) return } }
-        catch (ex: Exception) { log.error("Upload worker polling failed: {}", ex.javaClass.simpleName) }
-    }
 }
