@@ -11,8 +11,7 @@ class JdbcModelMetadataRepository(private val jdbc: JdbcTemplate) : ModelMetadat
     override val datasetVersion: String
         get() = jdbc.query(
             "SELECT r.dataset_version FROM model_active_release active JOIN model_release r ON r.id = active.release_id WHERE active.singleton = 1",
-            { rs, _ -> rs.getString(1) },
-        ).singleOrNull().orEmpty()
+        ) { rs, _ -> rs.getString(1) }.singleOrNull().orEmpty()
 
     override fun findVersionedById(modelId: String): VersionedModel? = findModels("AND c.model_id = ?", modelId).singleOrNull()
     override fun findById(modelId: String): ModelMetadata? = findVersionedById(modelId)?.model
