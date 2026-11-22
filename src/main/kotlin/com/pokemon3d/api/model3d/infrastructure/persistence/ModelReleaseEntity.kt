@@ -6,7 +6,6 @@ import jakarta.persistence.FetchType
 import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
-import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 import java.util.UUID
 
@@ -21,8 +20,7 @@ class ModelReleaseEntity(
     var storageBucket: String?,
     @Column(name = "storage_prefix", length = 200)
     var storagePrefix: String?,
-    @OneToMany(mappedBy = "release", fetch = FetchType.LAZY)
-    var metadata: MutableList<ModelMetadataEntity> = mutableListOf(),
+
 )
 
 @Entity

@@ -53,6 +53,8 @@ class PublicModelAccessConfigurer(
             .filterNot { it["Sid"] == POLICY_SID }
 
         val modelObjectPatterns = listOf(
+            "objects/sha256/*.glb",
+            "*/objects/sha256/*.glb",
             "releases/*/models/*/*.glb",
             "*/releases/*/models/*/*.glb",
         )

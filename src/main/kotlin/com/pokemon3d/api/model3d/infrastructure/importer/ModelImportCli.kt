@@ -14,11 +14,12 @@ import kotlin.system.exitProcess
 /** Administrative local CLI, deliberately not exposed as an unauthenticated HTTP endpoint. */
 fun main(args: Array<String>) {
     try {
-        require(args.isNotEmpty()) { "Expected submit|status|activate|retry" }
+        require(args.isNotEmpty()) { "Expected submit|patch|status|activate|retry" }
         val command = args[0]
-        require(command in setOf("submit", "status", "activate", "retry")) { "Unknown command" }
-        require((command == "submit" && args.size == 4) || (command != "submit" && args.size == 2)) {
-            "submit <data-root> <manifest> <request-key> | status|activate|retry <release-id>"
+        require(command in setOf("submit", "patch", "status", "activate", "retry")) { "Unknown command" }
+        val importsModels = command in setOf("submit", "patch")
+        require((importsModels && args.size == 4) || (!importsModels && args.size == 2)) {
+            "submit|patch <data-root> <manifest> <request-key> | status|activate|retry <release-id>"
         }
         SpringApplicationBuilder(Pokemon3dApplication::class.java)
             .web(WebApplicationType.NONE)
@@ -30,7 +31,7 @@ fun main(args: Array<String>) {
             )
             .use { context ->
                 val jobs = context.getBean<ModelUploadRepository>()
-                val id = if (command == "submit") {
+                val id = if (importsModels) {
                     val spool = Path.of(
                         context.environment.getProperty(
                             "pokemon.uploads.spool-path",
@@ -41,8 +42,9 @@ fun main(args: Array<String>) {
                         context.environment.getRequiredProperty("pokemon.storage.s3.bucket"),
                         context.environment.getProperty("pokemon.storage.s3.prefix", ""),
                     )
-                    ManifestDatabaseImporter(jobs, spool, location)
-                        .submit(Path.of(args[1]), Path.of(args[2]), args[3])
+                    val importer = ManifestDatabaseImporter(jobs, spool, location)
+                    if (command == "patch") importer.patch(Path.of(args[1]), Path.of(args[2]), args[3])
+                    else importer.submit(Path.of(args[1]), Path.of(args[2]), args[3])
                 } else UUID.fromString(args[1])
                 when (command) {
                     "activate" -> jobs.activate(id)

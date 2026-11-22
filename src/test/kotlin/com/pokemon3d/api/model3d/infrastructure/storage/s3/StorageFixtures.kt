@@ -8,10 +8,10 @@ import java.nio.ByteOrder
 import java.nio.file.Files
 import java.nio.file.Path
 
-internal fun createDataset(root: Path): Pair<Path, ModelManifest> {
+internal fun createDataset(root: Path, marker: String = ""): Pair<Path, ModelManifest> {
     val resource = StorageUnitTests::class.java.getResource("/manifest/valid.json")!!
     val manifest = ManifestJson.read(Path.of(resource.toURI()))
-    val json = """{"asset":{"version":"2.0"},"scenes":[{}],"scene":0}""".toByteArray()
+    val json = """{"asset":{"version":"2.0"},"scenes":[{}],"scene":0,"extras":{"marker":"$marker"}}""".toByteArray()
     val padding = (4 - json.size % 4) % 4
     val bytes = ByteBuffer.allocate(20 + json.size + padding)
         .order(ByteOrder.LITTLE_ENDIAN)

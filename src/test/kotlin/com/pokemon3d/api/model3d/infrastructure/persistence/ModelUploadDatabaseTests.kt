@@ -41,14 +41,18 @@ open class ModelUploadDatabaseTests {
 
     @BeforeEach fun clean() {
         jdbc.update("UPDATE model_active_release SET release_id=NULL,revision=0")
+        jdbc.update("UPDATE model_maintenance SET pruning=FALSE WHERE singleton=1")
+        jdbc.update("DELETE FROM model_release_member")
+        jdbc.update("DELETE FROM model_content")
+        jdbc.update("DELETE FROM model_asset")
         jdbc.update("DELETE FROM model_metadata")
         jdbc.update("DELETE FROM model_upload_job")
         jdbc.update("DELETE FROM model_release")
     }
 
-    private fun submit(version: String = UUID.randomUUID().toString(), key: String = version): UUID {
+    private fun submit(version: String = UUID.randomUUID().toString(), key: String = version, changedBinary: Boolean = false): UUID {
         val directory = Files.createDirectories(root.resolve(version))
-        val (path, manifest) = createDataset(directory)
+        val (path, manifest) = createDataset(directory, if (changedBinary) version else "")
         ManifestWriter.writeAtomic(path, manifest.copy(datasetVersion = version))
         return ManifestDatabaseImporter(jobs, root.resolve("spool"), storageLocation).submit(directory, path, key)
     }
@@ -58,7 +62,7 @@ open class ModelUploadDatabaseTests {
         assertTrue(models.findAll().isEmpty())
         assertFailsWith<UploadRejectedException> { jobs.activate(id) }
         val job = jobs.claim(lease, 3)!!
-        assertTrue(job.model.asset.path.startsWith("releases/$id/"))
+        assertEquals("objects/sha256/${job.model.asset.sha256}.glb", job.model.asset.path)
         Files.delete(root.resolve("v1/models/fixture_001.glb"))
         assertTrue(Files.exists(job.source))
         assertTrue(jobs.complete(job))
@@ -69,6 +73,95 @@ open class ModelUploadDatabaseTests {
         assertEquals(job.model, models.findById(job.model.modelId))
         assertEquals(listOf(job.model), models.findByPokedexNumber(job.model.pokedexNumber))
         jobs.activate(id) // idempotent activation
+    }
+
+    @Test fun `unchanged snapshot reuses published metadata and creates no upload job`() {
+        val first = submit("first")
+        jobs.complete(jobs.claim(lease, 3)!!)
+        jobs.activate(first)
+
+        val second = submit("second")
+
+        assertEquals("READY", jobs.status(second).state)
+        assertEquals(1, jobs.status(second).succeeded)
+        assertNull(jobs.claim(lease, 3))
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM model_upload_job", Int::class.java))
+        jobs.activate(second)
+        assertEquals("second", models.datasetVersion)
+    }
+
+    @Test fun `metadata-only patch preserves other models and needs neither source bytes nor upload`() {
+        val (path, manifest) = createDataset(root)
+        val first = manifest.models.single()
+        val second = first.copy(modelId = "fixture_002", asset = first.asset.copy(path = "models/fixture_002.glb"))
+        Files.copy(root.resolve(first.asset.path), root.resolve(second.asset.path))
+        ManifestWriter.writeAtomic(path, manifest.copy(modelCount = 2, models = listOf(first, second)))
+        val importer = ManifestDatabaseImporter(jobs, root.resolve("spool"), storageLocation)
+        val base = importer.submit(root, path, "base")
+        while (true) {
+            val job = jobs.claim(lease, 3) ?: break
+            jobs.complete(job)
+        }
+        jobs.activate(base)
+        val original = models.findById(second.modelId)
+        val changed = first.copy(nameKo = "수정된 이름")
+        ManifestWriter.writeAtomic(path, manifest.copy(datasetVersion = "patch", models = listOf(changed)))
+        Files.delete(root.resolve(first.asset.path))
+
+        val patch = importer.patch(root, path, "patch")
+
+        assertEquals(2, jobs.status(patch).expected)
+        assertEquals(2, jobs.status(patch).succeeded)
+        assertEquals("READY", jobs.status(patch).state)
+        assertNull(jobs.claim(lease, 3))
+        assertFalse(Files.exists(root.resolve("spool").resolve(patch.toString())))
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM model_asset", Int::class.java))
+        assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM model_content", Int::class.java))
+        assertEquals(manifest.datasetVersion, models.datasetVersion)
+        jobs.activate(patch)
+        assertEquals("수정된 이름", models.findById(first.modelId)?.nameKo)
+        assertEquals(original, models.findById(second.modelId))
+        assertEquals(patch, importer.patch(root, path, "patch"))
+    }
+
+    @Test fun `patch requires an active base release`() {
+        val (path, _) = createDataset(root)
+        assertFailsWith<UploadRejectedException> {
+            ManifestDatabaseImporter(jobs, root.resolve("spool"), storageLocation).patch(root, path, "patch")
+        }
+    }
+
+    @Test fun `same hash in a different storage location is not treated as published`() {
+        val current = submit("current")
+        jobs.complete(jobs.claim(lease, 3)!!)
+        jobs.activate(current)
+        val directory = Files.createDirectories(root.resolve("other"))
+        val (path, manifest) = createDataset(directory)
+        ManifestWriter.writeAtomic(path, manifest.copy(datasetVersion = "other"))
+        val next = ManifestDatabaseImporter(jobs, root.resolve("spool"), storageLocation.copy(prefix = "different"))
+            .submit(directory, path, "other")
+        assertEquals("UPLOADING", jobs.status(next).state)
+        assertNotNull(jobs.claim(lease, 3))
+    }
+
+    @Test fun `binary patch stages only its changed model and preserves the rest`() {
+        val first = submit("base")
+        jobs.complete(jobs.claim(lease, 3)!!)
+        jobs.activate(first)
+        val before = models.findAll().single()
+        val directory = Files.createDirectories(root.resolve("binary-patch"))
+        val (path, manifest) = createDataset(directory, "changed bytes")
+        ManifestWriter.writeAtomic(path, manifest.copy(datasetVersion = "binary-patch"))
+        val patch = ManifestDatabaseImporter(jobs, root.resolve("spool"), storageLocation).patch(directory, path, "binary")
+        assertEquals(1, jobs.status(patch).expected)
+        assertEquals("UPLOADING", jobs.status(patch).state)
+        assertEquals(before, models.findAll().single())
+        val job = jobs.claim(lease, 3)!!
+        assertNotEquals(before.asset.sha256, job.model.asset.sha256)
+        assertTrue(jobs.complete(job))
+        assertNull(jobs.claim(lease, 3))
+        jobs.activate(patch)
+        assertEquals(job.model, models.findAll().single())
     }
 
     @Test fun `legacy storage location backfill fills only missing entity properties`() {
@@ -141,7 +234,7 @@ open class ModelUploadDatabaseTests {
         }
         ModelUploadWorker(failing, publisher, lease, 3, Duration.ZERO).runOnce()
         assertEquals(1, puts)
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM model_metadata", Int::class.java))
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM model_content", Int::class.java))
         assertEquals(0, jobs.status(id).succeeded)
         ModelUploadWorker(jobs, publisher, lease, 3, Duration.ZERO).runOnce()
         assertEquals(1, puts)
@@ -152,7 +245,7 @@ open class ModelUploadDatabaseTests {
         val current = submit("current")
         jobs.complete(jobs.claim(lease, 3)!!)
         jobs.activate(current)
-        val next = submit("next")
+        val next = submit("next", changedBinary = true)
         val failed = jobs.claim(lease, 1)!!
         jobs.fail(failed, "UNAVAILABLE", 1, Duration.ZERO)
         assertEquals("FAILED", jobs.status(next).state)

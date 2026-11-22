@@ -27,15 +27,18 @@ class StorageIntegrationTests {
         val keys = ObjectKeyResolver(properties.prefix)
         val location = ModelStorageLocation(properties.bucket, properties.prefix)
         val (manifestPath, manifest) = createDataset(root)
-        val asset = manifest.models.single().asset
+        val originalModel = manifest.models.single()
+        val asset = originalModel.asset.copy(path = "objects/sha256/${originalModel.asset.sha256}.glb")
+        val model = originalModel.copy(asset = asset)
+        val source = root.resolve(originalModel.asset.path)
         S3ClientFactory.create(properties)
             .use { client ->
             client.createBucket { it.bucket(bucket) }
             try {
                 val store = S3ObjectStore(client, bucket)
                 val publisher = S3ModelAssetPublisher(client, properties)
-                publisher.publish(manifest.models.single(), root.resolve(asset.path), location)
-                publisher.publish(manifest.models.single(), root.resolve(asset.path), location)
+                publisher.publish(model, source, location)
+                publisher.publish(model, source, location)
                 assertEquals(
                     ContentDigest(asset.sizeBytes, asset.sha256),
                     store.contentDigest(keys.resolve(asset.path)),
@@ -53,11 +56,7 @@ class StorageIntegrationTests {
                 assertTrue(adapter.find(asset, location)!!.matches(asset))
                 assertNull(adapter.find(asset.copy(path = "models/missing.glb"), location))
                 // Public access is an explicit bucket policy, independent of the SDK credentials.
-                val resource = "arn:aws:s3:::$bucket/${keys.resolve("models")}/*"
-                client.putBucketPolicy {
-                    it.bucket(bucket)
-                        .policy("""{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"s3:GetObject","Resource":"$resource"}]}""")
-                }
+                PublicModelAccessConfigurer(client, properties).configure()
                 HttpClient.newHttpClient()
                     .use { http ->
                     val request = HttpRequest.newBuilder(adapter.publicUrl(asset, location))
@@ -69,7 +68,7 @@ class StorageIntegrationTests {
                         .firstValue("Content-Type")
                         .orElseThrow()
                     assertEquals("model/gltf-binary", contentType)
-                    assertContentEquals(Files.readAllBytes(root.resolve(asset.path)), response.body())
+                    assertContentEquals(Files.readAllBytes(source), response.body())
                     val privateManifest = java.net.URI(properties.publicBaseUrl + "/" + keys.resolve("manifest.json"))
                     val privateRequest = HttpRequest.newBuilder(privateManifest)
                         .GET()

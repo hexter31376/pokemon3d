@@ -4,7 +4,7 @@ import com.pokemon3d.api.model3d.domain.ModelAssetStorage
 import com.pokemon3d.api.model3d.domain.ModelStorageLocation
 import com.pokemon3d.api.model3d.domain.StoredModelAsset
 import com.pokemon3d.api.model3d.infrastructure.manifest.ManifestJson
-import com.pokemon3d.api.model3d.infrastructure.persistence.MetadataCodec
+import com.pokemon3d.api.model3d.infrastructure.persistence.PublishedModelCatalog
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -37,9 +37,15 @@ class ModelQueryApiTests {
     @Autowired
     private lateinit var jdbc: JdbcTemplate
 
+    @Autowired
+    private lateinit var published: PublishedModelCatalog
+
     @BeforeEach
     fun seedActiveDataset() {
         jdbc.update("UPDATE model_active_release SET release_id = NULL, revision = 0 WHERE singleton = 1")
+        jdbc.update("DELETE FROM model_release_member")
+        jdbc.update("DELETE FROM model_content")
+        jdbc.update("DELETE FROM model_asset")
         jdbc.update("DELETE FROM model_metadata")
         jdbc.update("DELETE FROM model_upload_job")
         jdbc.update("DELETE FROM model_release")
@@ -85,15 +91,8 @@ class ModelQueryApiTests {
             "api-test",
         )
         models.forEach { model ->
-            jdbc.update(
-                """INSERT INTO model_metadata(id, release_id, model_id, pokedex_number, metadata_json)
-                    VALUES (?, ?, ?, ?, ?)""",
-                UUID.randomUUID(),
-                releaseId,
-                model.modelId,
-                model.pokedexNumber,
-                MetadataCodec.encode(model),
-            )
+            val content = published.publish(model, ModelStorageLocation("test-bucket", "api-test"))
+            jdbc.update("INSERT INTO model_release_member VALUES (?, ?, ?)", releaseId, model.modelId, content)
         }
         jdbc.update(
             "UPDATE model_active_release SET release_id = ?, revision = 7 WHERE singleton = 1",

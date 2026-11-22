@@ -1,7 +1,6 @@
 package com.pokemon3d.api.model3d.infrastructure.persistence
 
 import com.pokemon3d.api.model3d.domain.*
-import jakarta.persistence.EntityManager
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.queryForObject
 import org.springframework.stereotype.Repository
@@ -16,7 +15,7 @@ import java.util.UUID
 @Transactional
 class JpaModelUploadRepository(
     private val jdbc: JdbcTemplate,
-    private val em: EntityManager,
+    private val published: PublishedModelCatalog,
 ) : ModelUploadRepository {
     override fun register(
         id: UUID,
@@ -32,14 +31,12 @@ class JpaModelUploadRepository(
         require(models.isNotEmpty())
         require(hasUniqueModelIds(models))
         // Serialize registration and activation so base_revision and idempotency are consistent.
-        val revision = requireNotNull(
-            jdbc.queryForObject<Long>(
-                "SELECT revision FROM model_active_release WHERE singleton=1 FOR UPDATE",
-            ),
-        ) { "Active release revision is missing" }
+        val revision = lockActiveRevision()
+        requireImportsAllowed()
         findRequest(requestKey, fingerprint)?.let { return it }
         insertRelease(id, requestKey, version, fingerprint, revision, storageLocation, models.size)
-        insertJobs(id, models)
+        registerModels(id, models, storageLocation)
+        markReady(id)
         return id
     }
 
@@ -70,21 +67,71 @@ class JpaModelUploadRepository(
         )
     }
 
-    private fun insertJobs(releaseId: UUID, models: List<PreparedModel>) {
-        models.forEach { model ->
-            jdbc.update(
-                """
-                INSERT INTO model_upload_job(
-                    id, release_id, model_id, metadata_json, source_path, state
-                ) VALUES (?, ?, ?, ?, ?, 'PENDING')
-                """.trimIndent(),
-                UUID.randomUUID(),
-                releaseId,
-                model.metadata.modelId,
-                MetadataCodec.encode(model.metadata),
-                model.source.toString(),
-            )
+    override fun findPublishedAsset(asset: ModelAsset, location: ModelStorageLocation): ModelAsset? =
+        published.findAsset(asset, location)?.let { asset.copy(path = it.path) }
+
+    override fun activeReleaseId(): UUID? = jdbc.query(
+        "SELECT release_id FROM model_active_release WHERE singleton = 1",
+        { rs, _ -> rs.getObject(1, UUID::class.java) },
+    ).singleOrNull()
+
+    override fun registerPatch(
+        id: UUID, requestKey: String, version: String, fingerprint: String,
+        storageLocation: ModelStorageLocation, baseReleaseId: UUID, models: List<PreparedModel>,
+    ): UUID {
+        require(models.isNotEmpty() && hasUniqueModelIds(models))
+        require(requestKey.isNotBlank() && requestKey.length <= 200)
+        require(version.isNotBlank() && version.length <= 200 && storageLocation.bucket.isNotBlank())
+        val revision = lockActiveRevision()
+        requireImportsAllowed()
+        findRequest(requestKey, fingerprint)?.let { return it }
+        if (activeReleaseId() != baseReleaseId) throw UploadRejectedException("Active release changed; resubmit the patch")
+        val existingIds = jdbc.query("SELECT model_id FROM model_release_member WHERE release_id = ?",
+            { rs, _ -> rs.getString(1) }, baseReleaseId).toSet()
+        val count = (existingIds + models.map { it.metadata.modelId }).size
+        insertRelease(id, requestKey, version, fingerprint, revision, storageLocation, count)
+        jdbc.update("""INSERT INTO model_release_member(release_id, model_id, content_id)
+            SELECT ?, model_id, content_id FROM model_release_member WHERE release_id = ?""", id, baseReleaseId)
+        models.forEach { jdbc.update("DELETE FROM model_release_member WHERE release_id = ? AND model_id = ?", id, it.metadata.modelId) }
+        registerModels(id, models, storageLocation)
+        markReady(id)
+        return id
+    }
+
+    private fun lockActiveRevision(): Long = requireNotNull(jdbc.queryForObject<Long>(
+        "SELECT revision FROM model_active_release WHERE singleton = 1 FOR UPDATE",
+    )) { "Active release revision is missing" }
+
+    private fun requireImportsAllowed() {
+        if (jdbc.queryForObject<Boolean>("SELECT pruning FROM model_maintenance WHERE singleton = 1") == true) {
+            throw UploadRejectedException("Asset pruning is running; retry after it finishes")
         }
+    }
+
+    private fun registerModels(releaseId: UUID, models: List<PreparedModel>, location: ModelStorageLocation) {
+        models.forEach { model ->
+            if (published.findAsset(model.metadata.asset, location) != null) {
+                addMember(releaseId, model.metadata.modelId, published.publish(model.metadata, location))
+            } else {
+                if (!java.nio.file.Files.isRegularFile(model.source)) {
+                    throw UploadRejectedException("Published asset changed while preparing import; resubmit")
+                }
+                jdbc.update("""INSERT INTO model_upload_job(id, release_id, model_id, metadata_json, source_path, state)
+                    VALUES (?, ?, ?, ?, ?, 'PENDING')""",
+                    UUID.randomUUID(), releaseId, model.metadata.modelId, MetadataCodec.encode(model.metadata), model.source.toString())
+            }
+        }
+    }
+
+    private fun addMember(releaseId: UUID, modelId: String, contentId: UUID) {
+        jdbc.update("INSERT INTO model_release_member(release_id, model_id, content_id) VALUES (?, ?, ?)",
+            releaseId, modelId, contentId)
+    }
+
+    private fun markReady(releaseId: UUID) {
+        jdbc.update("""UPDATE model_release SET state = 'READY'
+            WHERE id = ? AND expected_count = (SELECT COUNT(*) FROM model_release_member WHERE release_id = ?)""",
+            releaseId, releaseId)
     }
 
     private fun hasUniqueModelIds(models: List<PreparedModel>): Boolean =
@@ -181,41 +228,12 @@ class JpaModelUploadRepository(
 
     override fun complete(job: UploadJob): Boolean {
         if (!owns(job)) return false
-        jdbc.queryForObject<String>(
-            "SELECT state FROM model_release WHERE id = ? FOR UPDATE",
-            job.releaseId,
-        )
-        val release = em.getReference(ModelReleaseEntity::class.java, job.releaseId)
-        em.persist(
-            ModelMetadataEntity(
-                job.id,
-                release,
-                job.model.modelId,
-                job.model.pokedexNumber,
-                MetadataCodec.encode(job.model),
-            ),
-        )
-        em.flush()
-        jdbc.update(
-            """
-            UPDATE model_upload_job
-            SET state = 'SUCCEEDED', lease_token = NULL, lease_until = NULL, last_error = NULL
-            WHERE id = ?
-            """.trimIndent(),
-            job.id,
-        )
-        jdbc.update(
-            """
-            UPDATE model_release
-            SET state = 'READY'
-            WHERE id = ? AND expected_count = (
-                SELECT COUNT(*) FROM model_upload_job
-                WHERE release_id = ? AND state = 'SUCCEEDED'
-            )
-            """.trimIndent(),
-            job.releaseId,
-            job.releaseId,
-        )
+        lockActiveRevision()
+        jdbc.queryForObject<String>("SELECT state FROM model_release WHERE id = ? FOR UPDATE", job.releaseId)
+        addMember(job.releaseId, job.model.modelId, published.publish(job.model, job.storageLocation))
+        jdbc.update("""UPDATE model_upload_job SET state = 'SUCCEEDED', metadata_json = NULL,
+            lease_token = NULL, lease_until = NULL, last_error = NULL WHERE id = ?""", job.id)
+        markReady(job.releaseId)
         return true
     }
 
@@ -270,7 +288,7 @@ class JpaModelUploadRepository(
     override fun status(releaseId: UUID): ReleaseStatus = jdbc.query(
         """
         SELECT r.*,
-               (SELECT COUNT(*) FROM model_upload_job j WHERE j.release_id = r.id AND j.state = 'SUCCEEDED') AS succeeded,
+               (SELECT COUNT(*) FROM model_release_member member WHERE member.release_id = r.id) AS succeeded,
                (SELECT COUNT(*) FROM model_upload_job j WHERE j.release_id = r.id AND j.state = 'FAILED') AS failed,
                (SELECT release_id FROM model_active_release WHERE singleton = 1) AS active_id
         FROM model_release r
@@ -309,6 +327,7 @@ class JpaModelUploadRepository(
         ) { rs, _ -> rs.getObject(1, UUID::class.java) to rs.getLong(2) }
             .single()
         if (active.first == releaseId) return
+        requireImportsAllowed()
         val release = jdbc.query(
             "SELECT state, base_revision, expected_count FROM model_release WHERE id = ? FOR UPDATE",
             { rs, _ -> Triple(rs.getString(1), rs.getLong(2), rs.getInt(3)) },
@@ -321,7 +340,7 @@ class JpaModelUploadRepository(
             throw UploadRejectedException("Active release changed since submission; import a new release")
         }
         val metadataCount = jdbc.queryForObject<Int>(
-            "SELECT COUNT(*) FROM model_metadata WHERE release_id = ?",
+            "SELECT COUNT(*) FROM model_release_member WHERE release_id = ?",
             releaseId,
         )
         check(metadataCount == release.third)
