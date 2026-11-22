@@ -1,6 +1,6 @@
 package com.pokemon3d.api
 
-import com.pokemon3d.api.catalog.domain.ModelMetadataRepository
+import com.pokemon3d.api.catalog.application.port.output.ModelMetadataRepository
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired

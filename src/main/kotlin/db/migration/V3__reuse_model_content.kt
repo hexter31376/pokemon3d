@@ -1,8 +1,8 @@
 package db.migration
 
 import com.pokemon3d.api.assets.domain.ModelStorageLocation
-import com.pokemon3d.api.publishing.infrastructure.persistence.MetadataCodec
-import com.pokemon3d.api.publishing.infrastructure.persistence.PublishedModelCatalog
+import com.pokemon3d.api.publishing.adapter.output.persistence.MetadataCodec
+import com.pokemon3d.api.publishing.adapter.output.persistence.PublishedModelCatalog
 import java.util.UUID
 import org.flywaydb.core.api.migration.BaseJavaMigration
 import org.flywaydb.core.api.migration.Context

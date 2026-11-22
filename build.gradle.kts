@@ -31,7 +31,7 @@ dependencies {
     testRuntimeOnly("com.h2database:h2")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-validation")
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.2.0")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.2.1")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("tools.jackson.module:jackson-module-kotlin")
     runtimeOnly("org.postgresql:postgresql")
@@ -66,14 +66,14 @@ tasks.register<JavaExec>("modelManifest") {
     group = "verification"
     description = "Extracts or verifies GLB metadata (--args='extract|verify --data-root ...')."
     classpath = sourceSets.main.get().runtimeClasspath
-    mainClass.set("com.pokemon3d.api.publishing.infrastructure.manifest.tools.ModelManifestCliKt")
+    mainClass.set("com.pokemon3d.api.publishing.adapter.input.cli.ModelManifestCliKt")
 }
 
 tasks.register<JavaExec>("verifyModelManifest") {
     group = "verification"
     description = "Validates an offline import manifest (-PmanifestPath=...)."
     classpath = sourceSets.main.get().runtimeClasspath
-    mainClass.set("com.pokemon3d.api.publishing.infrastructure.manifest.VerifyModelManifestKt")
+    mainClass.set("com.pokemon3d.api.publishing.adapter.input.cli.VerifyModelManifestKt")
     args(providers.gradleProperty("manifestPath").getOrElse(""))
 }
 
@@ -99,14 +99,14 @@ tasks.register<JavaExec>("modelImport") {
     group = "application"
     description = "Imports metadata into the durable DB queue, or shows/activates/retries a release."
     classpath = sourceSets.main.get().runtimeClasspath
-    mainClass.set("com.pokemon3d.api.publishing.infrastructure.importer.ModelImportCliKt")
+    mainClass.set("com.pokemon3d.api.publishing.adapter.input.cli.ModelImportCliKt")
 }
 
 tasks.register<JavaExec>("configurePublicModelAccess") {
     group = "application"
     description = "Grants anonymous GET and browser CORS access only to published GLB objects in the configured bucket."
     classpath = sourceSets.main.get().runtimeClasspath
-    mainClass.set("com.pokemon3d.api.assets.infrastructure.storage.s3.ConfigurePublicModelAccessKt")
+    mainClass.set("com.pokemon3d.api.assets.adapter.input.cli.ConfigurePublicModelAccessKt")
 }
 
 tasks.register<Test>("databaseIntegrationTest") {
