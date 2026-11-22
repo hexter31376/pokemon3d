@@ -15,6 +15,7 @@ import org.junit.jupiter.api.io.TempDir
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.core.queryForObject
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
 import java.nio.file.Files
@@ -30,7 +31,7 @@ import kotlin.test.*
     "spring.datasource.username=sa", "spring.datasource.password=",
     "pokemon.uploads.enabled=false", "pokemon.storage.s3.enabled=false",
 ])
-open class ModelUploadDatabaseTests {
+class ModelUploadDatabaseTests {
     @Autowired lateinit var jobs: ModelUploadRepository
     @Autowired lateinit var models: ModelMetadataRepository
     @Autowired lateinit var jdbc: JdbcTemplate
@@ -87,7 +88,7 @@ open class ModelUploadDatabaseTests {
         assertEquals("READY", jobs.status(second).state)
         assertEquals(1, jobs.status(second).succeeded)
         assertNull(jobs.claim(lease, 3))
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM model_upload_job", Int::class.java))
+        assertEquals(1, jdbc.queryForObject<Int>("SELECT COUNT(*) FROM model_upload_job"))
         jobs.activate(second)
         assertEquals("second", models.datasetVersion)
     }
@@ -117,8 +118,8 @@ open class ModelUploadDatabaseTests {
         assertEquals("READY", jobs.status(patch).state)
         assertNull(jobs.claim(lease, 3))
         assertFalse(Files.exists(root.resolve("spool").resolve(patch.toString())))
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM model_asset", Int::class.java))
-        assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM model_content", Int::class.java))
+        assertEquals(1, jdbc.queryForObject<Int>("SELECT COUNT(*) FROM model_asset"))
+        assertEquals(3, jdbc.queryForObject<Int>("SELECT COUNT(*) FROM model_content"))
         assertEquals(manifest.datasetVersion, models.datasetVersion)
         jobs.activate(patch)
         assertEquals("수정된 이름", models.findById(first.modelId)?.nameKo)
@@ -177,8 +178,8 @@ open class ModelUploadDatabaseTests {
         val currentAsset = models.findAll().single().asset
         val candidate = submit("candidate", changedBinary = true)
         jobs.complete(jobs.claim(lease, 3)!!)
-        val candidateAsset = jdbc.queryForObject("SELECT object_path FROM model_asset WHERE sha256 NOT IN (?, ?)",
-            String::class.java, oldAsset.sha256, currentAsset.sha256)!!
+        val candidateAsset = jdbc.queryForObject<String>("SELECT object_path FROM model_asset WHERE sha256 NOT IN (?, ?)",
+            oldAsset.sha256, currentAsset.sha256)!!
 
         val plan = retention.retainCurrentAssets(storageLocation)
 
@@ -227,14 +228,12 @@ open class ModelUploadDatabaseTests {
             backfill.afterSingletonsInstantiated()
         }
 
-        assertEquals("existing-bucket", jdbc.queryForObject(
+        assertEquals("existing-bucket", jdbc.queryForObject<String>(
             "SELECT storage_bucket FROM model_release WHERE id=?",
-            String::class.java,
             releaseId,
         ))
-        assertEquals("configured-prefix", jdbc.queryForObject(
+        assertEquals("configured-prefix", jdbc.queryForObject<String>(
             "SELECT storage_prefix FROM model_release WHERE id=?",
-            String::class.java,
             releaseId,
         ))
     }
@@ -243,7 +242,7 @@ open class ModelUploadDatabaseTests {
         val id = submit("v1", "request")
         assertEquals(id, submit("v1", "request"))
         assertFailsWith<UploadRejectedException> { submit("v2", "request") }
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM model_upload_job", Int::class.java))
+        assertEquals(1, jdbc.queryForObject<Int>("SELECT COUNT(*) FROM model_upload_job"))
     }
 
     @Test fun `expired lease is reclaimed and stale worker cannot commit or fail the new job`() {
@@ -281,7 +280,7 @@ open class ModelUploadDatabaseTests {
         }
         ModelUploadWorker(failing, publisher, lease, 3, Duration.ZERO).runOnce()
         assertEquals(1, puts)
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM model_content", Int::class.java))
+        assertEquals(0, jdbc.queryForObject<Int>("SELECT COUNT(*) FROM model_content"))
         assertEquals(0, jobs.status(id).succeeded)
         ModelUploadWorker(jobs, publisher, lease, 3, Duration.ZERO).runOnce()
         assertEquals(1, puts)
@@ -339,8 +338,8 @@ open class ModelUploadDatabaseTests {
                 .map { it.get() }
             assertEquals(ids[0], ids[1])
         }
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM model_release", Int::class.java))
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM model_upload_job", Int::class.java))
+        assertEquals(1, jdbc.queryForObject<Int>("SELECT COUNT(*) FROM model_release"))
+        assertEquals(1, jdbc.queryForObject<Int>("SELECT COUNT(*) FROM model_upload_job"))
     }
 
     @Test fun `crashed final attempt is marked failed rather than stuck forever`() {

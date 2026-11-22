@@ -44,8 +44,8 @@ class ModelAssetRetentionRepository(private val jdbc: JdbcTemplate) {
         // Old processes may still read the legacy snapshot during the rolling upgrade.
         jdbc.query("SELECT metadata_json FROM model_metadata WHERE release_id = ?",
             { rs, _ -> MetadataCodec.decode(rs.getString(1)).asset.path }, active.first).forEach { paths.add(it) }
-        jdbc.query("SELECT metadata_json FROM model_upload_job WHERE state IN ('PENDING', 'RUNNING')",
-            { rs, _ -> MetadataCodec.decode(rs.getString(1)).asset.path }).forEach { paths.add(it) }
+        jdbc.query("SELECT metadata_json FROM model_upload_job WHERE state IN ('PENDING', 'RUNNING')"
+        ) { rs, _ -> MetadataCodec.decode(rs.getString(1)).asset.path }.forEach { paths.add(it) }
         require(paths.isNotEmpty()) { "No protected assets; refusing to prune" }
         val retiredReleases = jdbc.query("""SELECT id FROM model_release
             WHERE id <> ? AND base_revision < ? AND storage_bucket = ? AND storage_prefix = ?""",

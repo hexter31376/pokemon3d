@@ -4,6 +4,7 @@ import com.pokemon3d.api.model3d.infrastructure.manifest.ManifestJson
 import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.Test
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.core.queryForObject
 import org.springframework.jdbc.datasource.SingleConnectionDataSource
 import javax.sql.DataSource
 import java.nio.file.Path
@@ -39,10 +40,10 @@ internal fun verifyLegacyContentUpgrade(dataSource: DataSource) {
 
         Flyway.configure().dataSource(dataSource).load().migrate()
 
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM model_asset", Int::class.java))
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM model_content", Int::class.java))
-        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM model_release_member", Int::class.java))
-        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM model_metadata", Int::class.java))
+        assertEquals(1, jdbc.queryForObject<Int>("SELECT COUNT(*) FROM model_asset"))
+        assertEquals(1, jdbc.queryForObject<Int>("SELECT COUNT(*) FROM model_content"))
+        assertEquals(2, jdbc.queryForObject<Int>("SELECT COUNT(*) FROM model_release_member"))
+        assertEquals(2, jdbc.queryForObject<Int>("SELECT COUNT(*) FROM model_metadata"))
         val repository = JdbcModelMetadataRepository(jdbc)
         assertEquals("version-1", repository.datasetVersion)
         assertEquals("releases/$active/model.glb", repository.findById(model.modelId)?.asset?.path)

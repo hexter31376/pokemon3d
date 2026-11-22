@@ -74,12 +74,12 @@ class JpaModelUploadRepository(
         SELECT DISTINCT completed.source_path FROM model_upload_job completed WHERE completed.state = 'SUCCEEDED'
           AND NOT EXISTS (SELECT 1 FROM model_upload_job unfinished
                           WHERE unfinished.source_path = completed.source_path AND unfinished.state <> 'SUCCEEDED')
-    """.trimIndent(), { rs, _ -> Path.of(rs.getString(1)) })
+    """.trimIndent()
+    ) { rs, _ -> Path.of(rs.getString(1)) }
 
     override fun activeReleaseId(): UUID? = jdbc.query(
         "SELECT release_id FROM model_active_release WHERE singleton = 1",
-        { rs, _ -> rs.getObject(1, UUID::class.java) },
-    ).singleOrNull()
+    ) { rs, _ -> rs.getObject(1, UUID::class.java) }.singleOrNull()
 
     override fun registerPatch(
         id: UUID, requestKey: String, version: String, fingerprint: String,
