@@ -2,6 +2,7 @@ package com.pokemon3d.api.model3d.infrastructure.persistence
 
 import com.pokemon3d.api.model3d.application.ModelUploadWorker
 import com.pokemon3d.api.model3d.domain.*
+import com.pokemon3d.api.model3d.infrastructure.importer.CompletedUploadSpool
 import com.pokemon3d.api.model3d.infrastructure.importer.ManifestDatabaseImporter
 import com.pokemon3d.api.model3d.infrastructure.manifest.tools.ManifestWriter
 import com.pokemon3d.api.model3d.infrastructure.storage.s3.LegacyStorageLocationBackfill
@@ -34,6 +35,7 @@ open class ModelUploadDatabaseTests {
     @Autowired lateinit var models: ModelMetadataRepository
     @Autowired lateinit var jdbc: JdbcTemplate
     @Autowired lateinit var entityManager: EntityManager
+    @Autowired lateinit var retention: ModelAssetRetentionRepository
     @Autowired lateinit var transactionManager: PlatformTransactionManager
     @TempDir lateinit var root: Path
     private val lease = Duration.ofMinutes(10)
@@ -162,6 +164,51 @@ open class ModelUploadDatabaseTests {
         assertNull(jobs.claim(lease, 3))
         jobs.activate(patch)
         assertEquals(job.model, models.findAll().single())
+    }
+
+    @Test fun `pruning retires only unreferenced assets and preserves an in-flight candidate`() {
+        val old = submit("old")
+        jobs.complete(jobs.claim(lease, 3)!!)
+        jobs.activate(old)
+        val oldAsset = models.findAll().single().asset
+        val current = submit("current", changedBinary = true)
+        jobs.complete(jobs.claim(lease, 3)!!)
+        jobs.activate(current)
+        val currentAsset = models.findAll().single().asset
+        val candidate = submit("candidate", changedBinary = true)
+        jobs.complete(jobs.claim(lease, 3)!!)
+        val candidateAsset = jdbc.queryForObject("SELECT object_path FROM model_asset WHERE sha256 NOT IN (?, ?)",
+            String::class.java, oldAsset.sha256, currentAsset.sha256)!!
+
+        val plan = retention.retainCurrentAssets(storageLocation)
+
+        assertTrue(old.toString() in plan.retiredReleaseIds)
+        assertTrue(currentAsset.path in plan.protectedPaths)
+        assertTrue(candidateAsset in plan.protectedPaths)
+        assertTrue(oldAsset.path in plan.obsoletePaths)
+        assertNull(jobs.findPublishedAsset(oldAsset, storageLocation))
+        assertNotNull(jobs.findPublishedAsset(currentAsset, storageLocation))
+        assertEquals("READY", jobs.status(candidate).state)
+        assertFailsWith<UploadRejectedException> { jobs.activate(candidate) }
+        assertFailsWith<UploadRejectedException> { submit("blocked") }
+        retention.finishPruning()
+        jobs.activate(candidate)
+    }
+
+    @Test fun `completed staging is retained while another job still needs the shared source`() {
+        val (path, manifest) = createDataset(root)
+        val first = manifest.models.single()
+        val second = first.copy(modelId = "fixture_002", asset = first.asset.copy(path = "models/fixture_002.glb"))
+        Files.copy(root.resolve(first.asset.path), root.resolve(second.asset.path))
+        ManifestWriter.writeAtomic(path, manifest.copy(modelCount = 2, models = listOf(first, second)))
+        ManifestDatabaseImporter(jobs, root.resolve("spool"), storageLocation).submit(root, path, "shared")
+        val job = jobs.claim(lease, 3)!!
+        jobs.complete(job)
+        assertTrue(jobs.completedSourcePaths().isEmpty())
+        assertTrue(Files.exists(job.source))
+        jobs.complete(jobs.claim(lease, 3)!!)
+        assertEquals(1, CompletedUploadSpool(root.resolve("spool")).remove(jobs.completedSourcePaths()))
+        assertFalse(Files.exists(job.source))
     }
 
     @Test fun `legacy storage location backfill fills only missing entity properties`() {

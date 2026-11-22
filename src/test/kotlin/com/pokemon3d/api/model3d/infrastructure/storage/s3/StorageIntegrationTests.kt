@@ -1,5 +1,6 @@
 package com.pokemon3d.api.model3d.infrastructure.storage.s3
 
+import com.pokemon3d.api.model3d.domain.ModelAssetRetention
 import com.pokemon3d.api.model3d.domain.ModelStorageLocation
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -57,6 +58,15 @@ class StorageIntegrationTests {
                 assertNull(adapter.find(asset.copy(path = "models/missing.glb"), location))
                 // Public access is an explicit bucket policy, independent of the SDK credentials.
                 PublicModelAccessConfigurer(client, properties).configure()
+                val obsolete = keys.resolve("releases/old/models/obsolete/file.glb")
+                store.put(obsolete, source, "model/gltf-binary", asset.sha256)
+                val pruned = S3ObsoleteModelPruner(client, properties).prune(
+                    ModelAssetRetention(setOf(asset.path), emptySet(), setOf("old")),
+                )
+                assertEquals(1, pruned.deletedObjects)
+                assertNull(store.head(obsolete))
+                assertNotNull(store.head(keys.resolve(asset.path)))
+                assertNotNull(store.head(keys.resolve("manifest.json")))
                 HttpClient.newHttpClient()
                     .use { http ->
                     val request = HttpRequest.newBuilder(adapter.publicUrl(asset, location))

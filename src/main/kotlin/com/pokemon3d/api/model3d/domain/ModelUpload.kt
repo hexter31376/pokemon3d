@@ -22,6 +22,7 @@ interface ModelUploadRepository {
                  storageLocation: ModelStorageLocation, models: List<PreparedModel>): UUID
     fun findRequest(requestKey: String, fingerprint: String): UUID?
     fun findPublishedAsset(asset: ModelAsset, location: ModelStorageLocation): ModelAsset? = null
+    fun completedSourcePaths(): List<Path>
     fun activeReleaseId(): UUID?
     fun registerPatch(id: UUID, requestKey: String, version: String, fingerprint: String,
                       storageLocation: ModelStorageLocation, baseReleaseId: UUID, models: List<PreparedModel>): UUID

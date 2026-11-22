@@ -1,5 +1,9 @@
 package com.pokemon3d.api.model3d.infrastructure.importer
 
+import com.pokemon3d.api.model3d.infrastructure.persistence.ModelAssetRetentionRepository
+import com.pokemon3d.api.model3d.infrastructure.storage.s3.S3ClientFactory
+import com.pokemon3d.api.model3d.infrastructure.storage.s3.S3StorageProperties
+import com.pokemon3d.api.model3d.infrastructure.storage.s3.S3ObsoleteModelPruner
 import com.pokemon3d.api.Pokemon3dApplication
 import com.pokemon3d.api.model3d.domain.ModelStorageLocation
 import com.pokemon3d.api.model3d.domain.ModelUploadRepository
@@ -14,12 +18,12 @@ import kotlin.system.exitProcess
 /** Administrative local CLI, deliberately not exposed as an unauthenticated HTTP endpoint. */
 fun main(args: Array<String>) {
     try {
-        require(args.isNotEmpty()) { "Expected submit|patch|status|activate|retry" }
+        require(args.isNotEmpty()) { "Expected submit|patch|status|activate|retry|prune" }
         val command = args[0]
-        require(command in setOf("submit", "patch", "status", "activate", "retry")) { "Unknown command" }
+        require(command in setOf("submit", "patch", "status", "activate", "retry", "prune")) { "Unknown command" }
         val importsModels = command in setOf("submit", "patch")
-        require((importsModels && args.size == 4) || (!importsModels && args.size == 2)) {
-            "submit|patch <data-root> <manifest> <request-key> | status|activate|retry <release-id>"
+        require((importsModels && args.size == 4) || (command == "prune" && args.size == 1) || (!importsModels && command != "prune" && args.size == 2)) {
+            "submit|patch <data-root> <manifest> <request-key> | status|activate|retry <release-id> | prune"
         }
         SpringApplicationBuilder(Pokemon3dApplication::class.java)
             .web(WebApplicationType.NONE)
@@ -31,6 +35,23 @@ fun main(args: Array<String>) {
             )
             .use { context ->
                 val jobs = context.getBean<ModelUploadRepository>()
+                if (command == "prune") {
+                    val properties = S3StorageProperties.fromProperties { context.environment.getProperty(it) }
+                    val retention = context.getBean<ModelAssetRetentionRepository>()
+                    val retained = retention.retainCurrentAssets(
+                        ModelStorageLocation(properties.bucket, properties.prefix),
+                    )
+                    try {
+                        S3ClientFactory.create(properties).use { client ->
+                            println(S3ObsoleteModelPruner(client, properties).prune(retained))
+                        }
+                        val spool = Path.of(context.environment.getProperty("pokemon.uploads.spool-path", "runtime-data/uploads"))
+                        println("Completed spool files removed: ${CompletedUploadSpool(spool).remove(jobs.completedSourcePaths())}")
+                    } finally {
+                        retention.finishPruning()
+                    }
+                    return@use
+                }
                 val id = if (importsModels) {
                     val spool = Path.of(
                         context.environment.getProperty(

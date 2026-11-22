@@ -65,8 +65,11 @@ class S3StorageProperties(
                 uri.fragment == null &&
                 uri.normalize() == uri
 
-        fun fromEnvironment(env: Map<String, String> = System.getenv()): S3StorageProperties {
-            fun value(name: String): String = env["MODEL_STORAGE_$name"].orEmpty()
+        fun fromEnvironment(env: Map<String, String> = System.getenv()): S3StorageProperties =
+            fromProperties(env::get)
+
+        fun fromProperties(property: (String) -> String?): S3StorageProperties {
+            fun value(name: String): String = property("MODEL_STORAGE_$name").orEmpty()
             fun duration(name: String, fallback: String): Duration =
                 DurationStyle.detectAndParse(
                     value(name).ifBlank { fallback },
