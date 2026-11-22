@@ -1,13 +1,13 @@
 package db.migration
 
-import com.pokemon3d.api.model3d.domain.ModelStorageLocation
-import com.pokemon3d.api.model3d.infrastructure.persistence.MetadataCodec
-import com.pokemon3d.api.model3d.infrastructure.persistence.PublishedModelCatalog
+import com.pokemon3d.api.assets.domain.ModelStorageLocation
+import com.pokemon3d.api.publishing.infrastructure.persistence.MetadataCodec
+import com.pokemon3d.api.publishing.infrastructure.persistence.PublishedModelCatalog
+import java.util.UUID
 import org.flywaydb.core.api.migration.BaseJavaMigration
 import org.flywaydb.core.api.migration.Context
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.datasource.SingleConnectionDataSource
-import java.util.UUID
 
 class V3__reuse_model_content : BaseJavaMigration() {
     override fun migrate(context: Context) {

@@ -1,10 +1,10 @@
 package com.pokemon3d.api
 
-import com.pokemon3d.api.model3d.domain.ModelMetadataRepository
+import com.pokemon3d.api.catalog.domain.ModelMetadataRepository
+import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import kotlin.test.assertTrue
 
 @SpringBootTest(properties = [
     "spring.datasource.url=jdbc:h2:mem:startup;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",

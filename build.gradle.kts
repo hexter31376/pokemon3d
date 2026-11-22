@@ -66,14 +66,14 @@ tasks.register<JavaExec>("modelManifest") {
     group = "verification"
     description = "Extracts or verifies GLB metadata (--args='extract|verify --data-root ...')."
     classpath = sourceSets.main.get().runtimeClasspath
-    mainClass.set("com.pokemon3d.api.model3d.infrastructure.manifest.tools.ModelManifestCliKt")
+    mainClass.set("com.pokemon3d.api.publishing.infrastructure.manifest.tools.ModelManifestCliKt")
 }
 
 tasks.register<JavaExec>("verifyModelManifest") {
     group = "verification"
     description = "Validates an offline import manifest (-PmanifestPath=...)."
     classpath = sourceSets.main.get().runtimeClasspath
-    mainClass.set("com.pokemon3d.api.model3d.infrastructure.manifest.VerifyModelManifestKt")
+    mainClass.set("com.pokemon3d.api.publishing.infrastructure.manifest.VerifyModelManifestKt")
     args(providers.gradleProperty("manifestPath").getOrElse(""))
 }
 
@@ -99,14 +99,14 @@ tasks.register<JavaExec>("modelImport") {
     group = "application"
     description = "Imports metadata into the durable DB queue, or shows/activates/retries a release."
     classpath = sourceSets.main.get().runtimeClasspath
-    mainClass.set("com.pokemon3d.api.model3d.infrastructure.importer.ModelImportCliKt")
+    mainClass.set("com.pokemon3d.api.publishing.infrastructure.importer.ModelImportCliKt")
 }
 
 tasks.register<JavaExec>("configurePublicModelAccess") {
     group = "application"
     description = "Grants anonymous GET and browser CORS access only to published GLB objects in the configured bucket."
     classpath = sourceSets.main.get().runtimeClasspath
-    mainClass.set("com.pokemon3d.api.model3d.infrastructure.storage.s3.ConfigurePublicModelAccessKt")
+    mainClass.set("com.pokemon3d.api.assets.infrastructure.storage.s3.ConfigurePublicModelAccessKt")
 }
 
 tasks.register<Test>("databaseIntegrationTest") {
