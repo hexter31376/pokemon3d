@@ -231,8 +231,10 @@ class ModelQueryApiTests {
         mockMvc.get("/v3/api-docs")
             .andExpect {
                 status { isOk() }
-                jsonPath("$.info.title") { value("Pokemon3D API") }
+                jsonPath("$.info.title") { value("포켓몬 3D API") }
+                jsonPath("$.tags[0].name") { value("포켓몬·모델 조회") }
                 jsonPath("$.paths['/api/v1/pokemon']") { exists() }
+                jsonPath("$.paths['/api/v1/models'].get.summary") { value("모델 검색") }
                 jsonPath("$.paths['/api/v1/models/{modelId}']") { exists() }
                 jsonPath("$.paths['/api/v1/models/{modelId}/animations']") { exists() }
                 jsonPath("$.paths['/api/v1/filters']") { exists() }

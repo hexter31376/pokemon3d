@@ -7,9 +7,9 @@ import org.springframework.context.annotation.Configuration
 @Configuration(proxyBeanMethods = false)
 @OpenAPIDefinition(
     info = Info(
-        title = "Pokemon3D API",
+        title = "포켓몬 3D API",
         version = "v1",
-        description = "Read-only Pokemon and 3D model catalog",
+        description = "포켓몬과 3D 모델 정보를 조회하는 읽기 전용 API입니다.",
     ),
 )
 class OpenApiConfiguration

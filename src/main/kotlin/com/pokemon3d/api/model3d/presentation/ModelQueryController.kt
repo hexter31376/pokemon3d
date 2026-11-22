@@ -17,7 +17,6 @@ import com.pokemon3d.api.model3d.domain.ModelForm
 import com.pokemon3d.api.model3d.domain.ModelMotion
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
-import io.swagger.v3.oas.annotations.info.Info
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
@@ -34,40 +33,40 @@ import org.springframework.web.bind.annotation.RestController
 import java.net.URI
 
 @RequestMapping("/api/v1")
-@Tag(name = "Pokemon and Models", description = "Read-only Pokemon, model, animation, and filter queries")
+@Tag(name = "포켓몬·모델 조회", description = "포켓몬, 3D 모델, 애니메이션, 검색 필터를 조회하는 API")
 interface ModelQueryApi {
     @GetMapping("/pokemon")
-    @Operation(summary = "Search Pokemon", description = "Search Pokemon grouped by Pokedex number with filters and pagination.")
+    @Operation(summary = "포켓몬 검색", description = "도감 번호 기준으로 포켓몬을 묶어 검색하고 필터와 페이지네이션을 적용합니다.")
     fun searchPokemon(
         @Valid @ParameterObject @ModelAttribute request: ModelSearchRequest,
     ): ApiResponse<PageResponse<PokemonSummaryResponse>>
 
     @GetMapping("/pokemon/{dexNumber}")
-    @Operation(summary = "Get Pokemon", description = "Get one Pokemon and all of its model forms by Pokedex number.")
+    @Operation(summary = "포켓몬 상세 조회", description = "도감 번호에 해당하는 포켓몬과 보유한 모든 모델 폼을 조회합니다.")
     fun getPokemon(
-        @PathVariable @Min(1) @Parameter(description = "National Pokedex number", example = "25") dexNumber: Int,
+        @PathVariable @Min(1) @Parameter(description = "전국도감 번호", example = "25") dexNumber: Int,
     ): ApiResponse<PokemonDetailResponse>
 
     @GetMapping("/models")
-    @Operation(summary = "Search models", description = "Search model forms with filters, stable sorting, and pagination.")
+    @Operation(summary = "모델 검색", description = "각 폼과 이로치 모델을 개별 항목으로 검색하고 필터·정렬·페이지네이션을 적용합니다.")
     fun searchModels(
         @Valid @ParameterObject @ModelAttribute request: ModelSearchRequest,
     ): ApiResponse<PageResponse<ModelSummaryResponse>>
 
     @GetMapping("/models/{modelId}")
-    @Operation(summary = "Get model", description = "Get model metadata, public GLB URL, release revision, animation, and camera data.")
+    @Operation(summary = "모델 상세 조회", description = "모델 메타데이터, 공개 GLB URL, 리비전, 애니메이션, 기본 카메라 정보를 조회합니다.")
     fun getModel(
-        @PathVariable @Parameter(description = "Stable model identifier", example = "pikachu") modelId: String,
+        @PathVariable @Parameter(description = "모델의 고유 식별자", example = "pikachu") modelId: String,
     ): ApiResponse<ModelDetailResponse>
 
     @GetMapping("/models/{modelId}/animations")
-    @Operation(summary = "Get model animations", description = "Get animation and auxiliary effect tracks for a model.")
+    @Operation(summary = "모델 애니메이션 조회", description = "모델의 동작 애니메이션과 보조 효과 트랙을 조회합니다.")
     fun getAnimations(
-        @PathVariable @Parameter(description = "Stable model identifier", example = "pikachu") modelId: String,
+        @PathVariable @Parameter(description = "모델의 고유 식별자", example = "pikachu") modelId: String,
     ): ApiResponse<ModelAnimationsResponse>
 
     @GetMapping("/filters")
-    @Operation(summary = "Get filter options", description = "Get distinct filter values available in the active dataset.")
+    @Operation(summary = "검색 필터 옵션 조회", description = "현재 활성 데이터셋에서 사용할 수 있는 폼·성별·세대·이로치 값을 조회합니다.")
     fun getFilters(): ApiResponse<ModelFilterOptionsResponse>
 }
 
@@ -97,29 +96,30 @@ class ModelQueryController(
 
 data class ModelSearchRequest(
     @field:Min(1)
-    @field:Schema(description = "National Pokedex number", example = "25")
+    @field:Schema(description = "전국도감 번호", example = "25")
     val pokedexNumber: Int? = null,
     @field:Size(max = 100)
-    @field:Schema(description = "Case-insensitive partial match for Korean or English name")
+    @field:Schema(description = "한글명 또는 영문명의 대소문자 구분 없는 부분 검색어")
     val name: String? = null,
     @field:Size(max = 80)
-    @field:Schema(description = "Exact form code or kind, or partial form label")
+    @field:Schema(description = "폼 코드·종류의 정확한 값 또는 폼 이름의 부분 검색어")
     val form: String? = null,
+    @field:Schema(description = "이로치 여부")
     val shiny: Boolean? = null,
     @field:Pattern(regexp = "(?i)^(shared|genderless|male|female)$")
-    @field:Schema(description = "Model gender", allowableValues = ["shared", "genderless", "male", "female"])
+    @field:Schema(description = "모델 성별", allowableValues = ["shared", "genderless", "male", "female"])
     val gender: String? = null,
-    @field:Min(1) @field:Schema(description = "Pokemon generation", example = "1")
+    @field:Min(1) @field:Schema(description = "포켓몬 세대", example = "1")
     val generation: Int? = null,
-    @field:Min(0) @field:Schema(description = "Zero-based page index")
+    @field:Min(0) @field:Schema(description = "0부터 시작하는 페이지 번호")
     val page: Int = 0,
-    @field:Min(1) @field:Max(100) @field:Schema(description = "Page size, maximum 100")
+    @field:Min(1) @field:Max(100) @field:Schema(description = "페이지당 항목 수 (최대 100)")
     val size: Int = 20,
     @field:Pattern(regexp = "^(pokedexNumber|modelId|nameKo|generation)$")
-    @field:Schema(allowableValues = ["pokedexNumber", "modelId", "nameKo", "generation"])
+    @field:Schema(description = "정렬 기준", allowableValues = ["pokedexNumber", "modelId", "nameKo", "generation"])
     val sort: String = "pokedexNumber",
     @field:Pattern(regexp = "(?i)^(asc|desc)$")
-    @field:Schema(allowableValues = ["asc", "desc"])
+    @field:Schema(description = "정렬 방향", allowableValues = ["asc", "desc"])
     val direction: String = "asc",
 ) {
     fun toCriteria() = ModelSearchCriteria(
